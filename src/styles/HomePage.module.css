@@ -1,0 +1,10 @@
+.homePageContainer {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #008080;
+    color: #ffffff;
+    font-family: monospace, monospace;
+    padding: 0;
+    margin: 0;
+}

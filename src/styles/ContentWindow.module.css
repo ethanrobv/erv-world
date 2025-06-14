@@ -1,0 +1,12 @@
+.contentWindow {
+    background-color: #c0c0c0;
+    color: black;
+    border: 4px outset grey;
+    margin: 20px;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+}
