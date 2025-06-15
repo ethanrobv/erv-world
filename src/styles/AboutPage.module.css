@@ -8,3 +8,7 @@
     padding: 0;
     margin: 0;
 }
+
+.bodyText {
+    font-size: 2rem;
+}

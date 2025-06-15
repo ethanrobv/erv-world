@@ -3,3 +3,5 @@ declare module "*.module.css" {
   // noinspection JSUnusedGlobalSymbols
   export default classes;
 }
+
+declare module "*.css" {}

@@ -12,8 +12,12 @@
 .asciiArtDisplay {
     font-family: monospace, monospace;
     white-space: pre;
-    font-size: 10px;
+    font-size: 1.5rem;
     line-height: 1;
     padding: 0;
     text-align: center;
+}
+
+.bodyText {
+    font-size: 2rem;
 }

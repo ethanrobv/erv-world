@@ -2,17 +2,18 @@
     flex: 0 0 auto;
     background-color: black;
     color: white;
-    padding: 4px 12px;
-    border: 2px solid white;
+    padding: 0.4rem 1.2rem;
+    border: 0.2rem solid white;
     border-right-color: #000000;
     border-bottom-color: #000000;
     cursor: pointer;
     font-family: monospace, monospace;
-    font-size: 14px;
+    font-size: 1.4rem;
     line-height: 1;
     user-select: none;
     box-sizing: border-box;
     outline: none;
+    min-width: 4rem;
 }
 
 .navButton:active {
@@ -40,8 +41,8 @@
 }
 
 .arrow {
-    margin-left: 8px;
-    flex-shrink: 0;
+    width: 1em;
+    margin-left: 1rem;
 }
 
 .dropdownMenu {
@@ -50,7 +51,7 @@
     left: 0;
     width: 100%;
     background-color: #000080;
-    border-width: 4px;
+    border-width: 0.4rem;
     border-style: solid;
     border-color: #808080;
     box-sizing: border-box;
@@ -63,13 +64,13 @@
 }
 
 .dropdownItem {
-    padding: 4px 12px;
+    padding: 0.4rem 1.2rem;
     cursor: pointer;
     color: white;
     border-bottom-width: 2px;
     border-bottom-style: solid;
     border-bottom-color: white;
-    font-size: 14px;
+    font-size: 1.4rem;
     line-height: 1;
     box-sizing: border-box;
     background-color: black;

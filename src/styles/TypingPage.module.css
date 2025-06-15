@@ -12,5 +12,5 @@
 .innerContentWindow {
     background-color: darkgrey;
     box-shadow: none;
-    border: 4px solid grey;
+    border: 0.4rem solid grey;
 }

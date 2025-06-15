@@ -1,9 +1,9 @@
 .navBar {
     display: flex;
     justify-content: flex-start;
-    gap: 8px;
-    padding: 8px 8px 8px 16px;
-    border: 4px solid #808080;
+    gap: 0.8rem;
+    padding: 0.8rem 0.8rem 0.8rem 1.6rem;
+    border: 0.4rem solid #808080;
     background-color: #000080;
     box-sizing: border-box;
     user-select: none;

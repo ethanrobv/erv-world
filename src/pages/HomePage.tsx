@@ -19,7 +19,7 @@ const HomePage: React.FC = () => {
       <Navbar />
       <ContentWindow>
         <div className={styles.asciiArtDisplay}>{homePageArt}</div>
-        <div>
+        <div className={styles.bodyText}>
           <p>under perpetual construction</p>
         </div>
       </ContentWindow>

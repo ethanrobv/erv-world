@@ -1,17 +1,16 @@
 import React from "react";
 
 import { ContentWindow, Footer, Navbar } from "../components";
-import style from "../styles/AboutPage.module.css";
+import styles from "../styles/AboutPage.module.css";
 
 
 const AboutPage: React.FC = () => {
   return (
-    <div className={style.aboutPageContainer}>
+    <div className={styles.aboutPageContainer}>
       <Navbar />
       <ContentWindow>
-
-        <div>
-          <code><a href={"https://github.com/ethanrobv/erv-world"} target={"_blank"}>source code</a></code>
+        <div className={styles.bodyText}>
+          <a href={"https://github.com/ethanrobv/erv-world"} target={"_blank"}>source code</a>
         </div>
       </ContentWindow>
       <Footer />
