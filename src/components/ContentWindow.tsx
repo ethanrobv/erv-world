@@ -1,9 +1,9 @@
 import React from "react";
-import type { ContentWindowProps } from "../types/ContentWindowTypes.ts";
+import type { IContentWindowProps } from "../types/ContentWindowTypes.ts";
 import styles from "../styles/ContentWindow.module.css";
 
 
-const ContentWindow: React.FC<ContentWindowProps> = ({
+const ContentWindow: React.FC<IContentWindowProps> = ({
     children,
     className,
   }) => {

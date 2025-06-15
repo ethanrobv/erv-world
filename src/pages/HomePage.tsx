@@ -13,11 +13,15 @@ const HomePage: React.FC = () => {
 ██╔══╝  ██╔══██╗╚██╗ ██╔╝           ██║███╗██║██║   ██║██╔══██╗██║     ██║  ██║
 ███████╗██║  ██║ ╚████╔╝     ██╗    ╚███╔███╔╝╚██████╔╝██║  ██║███████╗██████╔╝
 ╚══════╝╚═╝  ╚═╝  ╚═══╝      ╚═╝     ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═════╝`;
+
   return (
     <div className={styles.homePageContainer}>
       <Navbar />
       <ContentWindow>
         <div className={styles.asciiArtDisplay}>{homePageArt}</div>
+        <div>
+          <p>under perpetual construction</p>
+        </div>
       </ContentWindow>
       <Footer />
     </div>

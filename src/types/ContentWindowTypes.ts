@@ -1,6 +1,7 @@
 import React from "react";
 
-export interface ContentWindowProps {
+
+export interface IContentWindowProps {
   children: React.ReactNode;
   className?: string;
 }

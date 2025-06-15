@@ -1,0 +1,16 @@
+.typingPageContainer {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: lightgrey;
+    color: #ffffff;
+    font-family: monospace, monospace;
+    padding: 0;
+    margin: 0;
+}
+
+.innerContentWindow {
+    background-color: darkgrey;
+    box-shadow: none;
+    border: 4px solid grey;
+}
