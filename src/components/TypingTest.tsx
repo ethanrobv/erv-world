@@ -32,9 +32,12 @@ const TypingTest: React.FC = () => {
         setIsLoading(false);
       }
     };
-
-    void fetchWords();
-  }, []);
+    if (isLoading){
+      void fetchWords();
+    } else if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isLoading]);
 
   const handleInputChange = (value: string) => {
     setUserInput(value);
