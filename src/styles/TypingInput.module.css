@@ -8,7 +8,7 @@
     margin: 0;
 }
 
-.textAreaField {
+.textInputField {
     width: 25.6rem;
     resize: none;
     padding: 0.2rem 0.4rem;
@@ -38,11 +38,11 @@
     transition: transform 0.05s ease-in-out;
 }
 
-.textAreaField:hover {
+.textInputField:hover {
     background-color: #D0D0D0;
 }
 
-.textAreaField:focus {
+.textInputField:focus {
     border: 0.2rem inset #808080;
     border-left-color: #F0F0F0;
     border-top-color: #F0F0F0;

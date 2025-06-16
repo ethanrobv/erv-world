@@ -1,25 +1,25 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { type JSX, type RefObject, useEffect, useState, useRef } from "react";
 
 import { ContentWindow } from "./";
 import TypingInput from "./TypingInput.tsx";
 import TypingWordDisplay from "./TypingWordDisplay.tsx";
 
 
-const TypingTest: React.FC = () => {
+const TypingTest: React.FC = (): JSX.Element => {
   const [isLoading, setIsLoading] = useState(true);
   const [words, setWords] = useState<string[]>([]);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [userInput, setUserInput] = useState("");
-  const inputRef = useRef<HTMLDivElement>(null);
+  const inputRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchWords = async () => {
+  useEffect((): void => {
+    const fetchWords: () => Promise<void> = async (): Promise<void> => {
       try {
         const response: Response = await fetch("/words_alpha.txt");
         const text: string = await response.text();
         const splitWords: string[] = text
           .split("\n")
-          .map(word => word.trim())
+          .map((word: string): string => word.trim())
           .filter(Boolean);
         for (let i: number = splitWords.length - 1; i > 0; i--) {
           const j: number = Math.floor(Math.random() * (i + 1));
@@ -39,13 +39,13 @@ const TypingTest: React.FC = () => {
     }
   }, [isLoading]);
 
-  const handleInputChange = (value: string) => {
+  const handleInputChange: (value: string) => void = (value: string): void => {
     setUserInput(value);
   };
 
-  const handleSpaceBar = () => {
+  const handleSpaceBar: () => boolean = (): boolean => {
     if (userInput.trim() === words[currentWordIndex]) {
-      setCurrentWordIndex(prevIndex => prevIndex + 1);
+      setCurrentWordIndex((prevIndex: number): number => prevIndex + 1);
       setUserInput("");
       return true;
     } else {

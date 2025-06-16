@@ -1,6 +1,6 @@
-import React, {useEffect, useRef, useState} from "react";
+import React, { type JSX, type RefObject, useEffect, useRef, useState } from "react";
 
-import type { IDropdownNavButton } from "../types/ButtonTypes.ts";
+import type { IDropdownItem, IDropdownNavButton } from "../types/ButtonTypes.ts";
 import styles from "../styles/NavButtons.module.css";
 
 
@@ -12,10 +12,10 @@ const DropdownNavButton: React.FC<IDropdownNavButton> = ({
     items,
     isOpen: initialIsOpen = false,
     onToggleDropdown,
-  }: IDropdownNavButton) => {
+  }: IDropdownNavButton): JSX.Element => {
   const [internalIsOpen, setInternalIsOpen] = useState(initialIsOpen);
 
-  const handleToggle = () => {
+  const handleToggle: () => void = (): void => {
     if (onToggleDropdown) {
       onToggleDropdown();
     } else {
@@ -23,12 +23,12 @@ const DropdownNavButton: React.FC<IDropdownNavButton> = ({
     }
   };
 
-  const currentIsOpen = onToggleDropdown ? initialIsOpen : internalIsOpen;
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownMenuRef = useRef<HTMLUListElement>(null);
+  const currentIsOpen: boolean = onToggleDropdown ? initialIsOpen : internalIsOpen;
+  const buttonRef: RefObject<HTMLButtonElement | null> = useRef<HTMLButtonElement>(null);
+  const dropdownMenuRef: RefObject<HTMLUListElement | null> = useRef<HTMLUListElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+  useEffect((): () => void => {
+    const handleClickOutside: (event: MouseEvent) => void = (event: MouseEvent): void => {
       if (dropdownMenuRef.current &&
           buttonRef.current &&
           !dropdownMenuRef.current.contains(event.target as Node) &&
@@ -44,7 +44,7 @@ const DropdownNavButton: React.FC<IDropdownNavButton> = ({
 
     document.addEventListener("mousedown", handleClickOutside);
 
-    return () => {
+    return (): void => {
       document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [currentIsOpen, onToggleDropdown]);
@@ -65,7 +65,7 @@ const DropdownNavButton: React.FC<IDropdownNavButton> = ({
           className={styles.dropdownMenu}
           ref={dropdownMenuRef}
         >
-          {items.map((item) => (
+          {items.map((item: IDropdownItem): JSX.Element => (
             <li key={item.id}>
               <button
                 onClick={item.onClick}

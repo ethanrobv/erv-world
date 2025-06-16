@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 
 import NavButton from "./NavbarButton.tsx";
@@ -7,7 +7,7 @@ import type { NavButtonType } from "../types/ButtonTypes.ts";
 import styles from "../styles/Navbar.module.css";
 
 
-export const Navbar: React.FC = () => {
+export const Navbar: React.FC = (): JSX.Element => {
   const navigate = useNavigate();
 
   const routeMap = {
@@ -20,8 +20,10 @@ export const Navbar: React.FC = () => {
     Music: "/misc/music",
   } as const;
 
-  const handleNavButtonOrDropdownClick = (routeString: keyof typeof routeMap) => {
-    const route = routeMap[routeString];
+  const handleNavButtonOrDropdownClick: (routeString: keyof typeof routeMap) => void = (routeString: keyof typeof routeMap): void => {
+    const route: (
+      "/" | "/about" | "/misc/typing" | "/misc/music"
+      ) = routeMap[routeString];
     if (route) {
       navigate(route);
     }
@@ -31,7 +33,7 @@ export const Navbar: React.FC = () => {
     {
       id: "home-nav-button",
       label: "Home",
-      onClick: () => handleNavButtonOrDropdownClick("Home"),
+      onClick: (): void => handleNavButtonOrDropdownClick("Home"),
       type: "base",
     },
     {
@@ -42,26 +44,26 @@ export const Navbar: React.FC = () => {
         {
           id: "misc-nav-button-dropdown-music",
           label: "Music",
-          onClick: () => handleNavButtonOrDropdownClick("Music"),
+          onClick: (): void => handleNavButtonOrDropdownClick("Music"),
         },
         {
           id: "misc-nav-button-dropdown-typing",
           label: "Typing",
-          onClick: () => handleNavButtonOrDropdownClick("Typing"),
+          onClick: (): void => handleNavButtonOrDropdownClick("Typing"),
         },
       ],
     },
     {
       id: "about-nav-button",
       label: "About",
-      onClick: () => handleNavButtonOrDropdownClick("About"),
+      onClick: (): void => handleNavButtonOrDropdownClick("About"),
       type: "base",
     },
   ];
 
   return (
     <nav className={styles.navBar}>
-      {navButtons.map((btn) => {
+      {navButtons.map((btn: NavButtonType): (JSX.Element | undefined) => {
         if (btn.type === "base") {
           return (
             <NavButton

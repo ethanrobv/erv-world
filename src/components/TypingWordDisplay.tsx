@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type JSX } from "react";
 
 import type { ITypingWordDisplayProps } from "../types/TypingComponentTypes.ts";
 import styles from "../styles/TypingWordDisplay.module.css";
@@ -8,7 +8,7 @@ const TypingWordDisplay: React.FC<ITypingWordDisplayProps> = ({
   previousWord,
   currentWord,
   nextWord,
-  }) => {
+  }: ITypingWordDisplayProps): JSX.Element => {
   return (
     <div className={styles.wordDisplayContainer}>
       <span className={styles.prevWord}>{previousWord}</span>

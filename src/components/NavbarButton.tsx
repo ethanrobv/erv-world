@@ -1,4 +1,5 @@
-import React from "react";
+import React, { type JSX } from "react";
+
 import type { INavButton } from "../types/ButtonTypes.ts";
 import styles from "../styles/NavButtons.module.css"
 
@@ -9,7 +10,7 @@ const NavButton: React.FC<INavButton> = ({
     onClick,
     isDisabled,
     className
-  }: INavButton) => {
+  }: INavButton): JSX.Element => {
   return (
     <button
       id={id}

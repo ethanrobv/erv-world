@@ -1,10 +1,10 @@
-import React from "react";
+import React, { type JSX } from "react";
 
 import { ContentWindow, Footer, Navbar } from "../components";
 import styles from "../styles/AboutPage.module.css";
 
 
-const AboutPage: React.FC = () => {
+const AboutPage: React.FC = (): JSX.Element => {
   return (
     <div className={styles.aboutPageContainer}>
       <Navbar />

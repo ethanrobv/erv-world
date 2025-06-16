@@ -1,7 +1,6 @@
 .footerContainer {
     font-family: monospace, monospace;
-    font-size: 8px;
     color: black;
-    margin-right: 20px;
+    margin-right: 2rem;
     text-align: right;
 }

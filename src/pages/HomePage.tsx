@@ -1,10 +1,10 @@
-import React from "react";
+import React, { type JSX } from "react";
 
 import { ContentWindow, Footer, Navbar } from "../components";
 import styles from "../styles/HomePage.module.css";
 
 
-const HomePage: React.FC = () => {
+const HomePage: React.FC = (): JSX.Element => {
   // https://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=ERV%20.%20WORLD%0A
   const homePageArt =
 `███████╗██████╗ ██╗   ██╗           ██╗    ██╗ ██████╗ ██████╗ ██╗     ██████╗ 

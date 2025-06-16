@@ -1,3 +1,4 @@
+import { type JSX } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import HomePage from "./pages/HomePage.tsx";
@@ -5,7 +6,7 @@ import AboutPage from "./pages/AboutPage.tsx";
 import TypingPage from "./pages/TypingPage.tsx";
 
 
-function App() {
+function App(): JSX.Element {
   return (
     <BrowserRouter>
       <Routes>
