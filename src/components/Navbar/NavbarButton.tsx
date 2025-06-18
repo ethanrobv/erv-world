@@ -1,16 +1,16 @@
 import React, { type JSX } from "react";
 
-import type { INavButton } from "../../types/NavbarTypes.ts";
+import type { INavButtonProps } from "../../types/NavbarTypes.ts";
 import styles from "../../styles/NavButtons.module.css"
 
 
-const NavButton: React.FC<INavButton> = ({
+const NavButton: React.FC<INavButtonProps> = ({
     id,
     label,
     onClick,
     isDisabled,
     className
-  }: INavButton): JSX.Element => {
+  }: INavButtonProps): JSX.Element => {
   return (
     <button
       id={id}

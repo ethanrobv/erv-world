@@ -1,5 +1,3 @@
-import React from "react";
-
 export interface ICommonButtonProps {
   id: string;
   label: string;
@@ -10,5 +8,4 @@ export interface ICommonButtonProps {
 export interface IDropdownItem {
   id: string;
   label: string;
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }

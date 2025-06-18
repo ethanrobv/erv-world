@@ -45,7 +45,7 @@
     margin-left: 1rem;
 }
 
-.dropdownMenu {
+.navDropdownMenu {
     position: absolute;
     top: 100%;
     left: 0;
@@ -63,7 +63,7 @@
     padding: 0;
 }
 
-.dropdownItem {
+.navDropdownItem {
     padding: 0.4rem 1.2rem;
     cursor: pointer;
     color: white;
@@ -82,6 +82,6 @@
     font-family: monospace, monospace;
 }
 
-.dropdownItem:hover {
+.navDropdownItem:hover {
     background-color: grey;
 }

@@ -1,14 +1,8 @@
-.musicKeyContainer {
-
-}
-
 .musicKeyButton {
     height: 2.5rem;
     width: 2.5rem;
-    margin-top: 1.5rem;
-    margin-bottom: 1.5rem;
 }
 
 .active {
-    background-color: #800000;
+    background-color: #000000;
 }

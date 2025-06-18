@@ -1,0 +1,10 @@
+.musicPageContainer {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: lightgrey;
+    color: #ffffff;
+    font-family: monospace, monospace;
+    padding: 0;
+    margin: 0;
+}

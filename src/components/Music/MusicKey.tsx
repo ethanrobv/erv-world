@@ -26,9 +26,7 @@ const MusicKey: React.FC<IMusicKeyProps> = ({
       <button
         className={className}
         onClick={handleOnClick}
-      >
-        {rowIndex}: {colIndex}
-      </button>
+      />
     </div>
   );
 }

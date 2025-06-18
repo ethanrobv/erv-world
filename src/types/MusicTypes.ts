@@ -1,4 +1,5 @@
 import type { ICommonButtonProps, IDropdownItem } from "./CommonTypes.ts";
+import React from "react";
 
 
 export interface IMusicKeyData {
@@ -13,13 +14,25 @@ export interface IMusicKeyProps extends IMusicKeyData {
 }
 
 export interface IMusicGridProps {
-  numRows: number;
   numCols: number;
+  musicKeys: IMusicKeyData[];
+  currentCol: number;
+  handleToggleKey: (rowIndex: number, colIndex: number) => void;
 }
 
-export interface IMusicInstrumentDropdownButton extends ICommonButtonProps {
-  items: IDropdownItem[];
+export interface IMusicDropdownItem extends IDropdownItem {
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
+export interface IDropdownMusicInstrumentButtonProps extends ICommonButtonProps {
+  rowIndex: number;
+  items: IMusicDropdownItem[];
   isOpen?: boolean,
   onToggleDropdown?: () => void;
-  placeholder: string;
+}
+
+export interface IMusicKeyRowControlProps {
+  rowIndex: number;
+  selectedInstrument: string,
+  onInstrumentChange: (rowNumber: number, selectedInstrument: string) => void;
 }

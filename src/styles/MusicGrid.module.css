@@ -2,3 +2,29 @@
     display: grid;
     grid-template-columns: 1fr 3fr;
 }
+
+.controllerContainer {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(1rem, 1fr));
+    grid-row-gap: 10rem;
+    justify-content: right;
+}
+
+.playStopButton {
+    background-color: #800040;
+    color: white;
+    border: 0.2rem solid white;
+    border-right-color: #000000;
+    border-bottom-color: #000000;
+    cursor: pointer;
+    font-family: monospace, monospace;
+    font-size: 2rem;
+    max-width: 16rem;
+}
+
+.innerContentWindow {
+    margin: 12rem;
+    background-color: darkgrey;
+    box-shadow: none;
+    border: 0.4rem solid grey;
+}

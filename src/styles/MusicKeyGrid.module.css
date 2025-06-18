@@ -1,3 +1,8 @@
 .musicKeyGrid {
     justify-content: right;
+    grid-row-gap: 10rem;
+}
+
+.playingColumn {
+    opacity: 0.3;
 }

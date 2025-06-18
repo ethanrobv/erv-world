@@ -1,11 +1,10 @@
-import React, { type JSX, type RefObject, useEffect, useRef, useState } from "react";
+import React, {type JSX, type RefObject, useEffect, useRef, useState} from "react";
 
-import type { NavDropdownItem } from "../../types/NavbarTypes.ts";
-import type { IDropdownNavButtonProps } from "../../types/NavbarTypes.ts";
-import styles from "../../styles/NavButtons.module.css";
+import type { IDropdownMusicInstrumentButtonProps, IMusicDropdownItem } from "../../types/MusicTypes.ts";
+import styles from "../../styles/MusicKeyRowController.module.css";
 
 
-const DropdownNavButton: React.FC<IDropdownNavButtonProps> = ({
+const DropdownMusicInstrumentButton: React.FC<IDropdownMusicInstrumentButtonProps> = ({
     id,
     label,
     isDisabled,
@@ -13,7 +12,7 @@ const DropdownNavButton: React.FC<IDropdownNavButtonProps> = ({
     items,
     isOpen: initialIsOpen = false,
     onToggleDropdown,
-  }: IDropdownNavButtonProps): JSX.Element => {
+  }: IDropdownMusicInstrumentButtonProps): JSX.Element => {
   const [internalIsOpen, setInternalIsOpen] = useState(initialIsOpen);
 
   const handleToggle: () => void = (): void => {
@@ -31,9 +30,9 @@ const DropdownNavButton: React.FC<IDropdownNavButtonProps> = ({
   useEffect((): () => void => {
     const handleClickOutside: (event: MouseEvent) => void = (event: MouseEvent): void => {
       if (dropdownMenuRef.current &&
-          buttonRef.current &&
-          !dropdownMenuRef.current.contains(event.target as Node) &&
-          !buttonRef.current.contains(event.target as Node)
+        buttonRef.current &&
+        !dropdownMenuRef.current.contains(event.target as Node) &&
+        !buttonRef.current.contains(event.target as Node)
       ) {
         if (currentIsOpen && onToggleDropdown === undefined) {
           setInternalIsOpen(false);
@@ -56,21 +55,21 @@ const DropdownNavButton: React.FC<IDropdownNavButtonProps> = ({
         id={id}
         onClick={handleToggle}
         disabled={isDisabled}
-        className={`${styles.navButton} ${styles.dropdownToggle}`}
+        className={`${styles.instrumentButton} ${styles.dropdownToggle}`}
         ref={buttonRef}
       >
         {label} <span className={styles.arrow}>{currentIsOpen ? '▼' : '▽'}</span>
       </button>
       {currentIsOpen && (
         <ul
-          className={styles.navDropdownMenu}
+          className={styles.instrumentDropdownMenu}
           ref={dropdownMenuRef}
         >
-          {items.map((item: NavDropdownItem): JSX.Element => (
+          {items.map((item: IMusicDropdownItem): JSX.Element => (
             <li key={item.id}>
               <button
                 onClick={item.onClick}
-                className={styles.navDropdownItem}
+                className={styles.instrumentDropdownItem}
               >
                 {item.label}
               </button>
@@ -82,4 +81,4 @@ const DropdownNavButton: React.FC<IDropdownNavButtonProps> = ({
   );
 };
 
-export default DropdownNavButton;
+export default DropdownMusicInstrumentButton;
