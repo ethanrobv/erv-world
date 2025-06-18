@@ -1,0 +1,26 @@
+import React, { type JSX } from "react";
+
+import type { INavButton } from "../../types/NavbarTypes.ts";
+import styles from "../../styles/NavButtons.module.css"
+
+
+const NavButton: React.FC<INavButton> = ({
+    id,
+    label,
+    onClick,
+    isDisabled,
+    className
+  }: INavButton): JSX.Element => {
+  return (
+    <button
+      id={id}
+      onClick={onClick}
+      disabled={isDisabled}
+      className={`${styles.navButton} ${className || ""}`}
+    >
+      {label}
+    </button>
+  )
+};
+
+export default NavButton;

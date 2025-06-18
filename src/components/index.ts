@@ -1,4 +1,5 @@
-export { default as ContentWindow } from "./ContentWindow";
-export { default as Footer } from "./Footer";
-export { default as Navbar } from "./Navbar";
-export { default as TypingTest }from "./TypingTest";
+export { default as ContentWindow } from "./Common/ContentWindow.tsx";
+export { default as Footer } from "./Common/Footer.tsx";
+export { default as MusicApp } from "./Music/MusicApp.tsx";
+export { default as Navbar } from "./Navbar/Navbar.tsx";
+export { default as TypingApp } from "./Typing/TypingApp.tsx";
