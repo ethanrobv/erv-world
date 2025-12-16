@@ -71,29 +71,18 @@ export default function Synth() {
                         return (
                             <div
                                 key={ `${ note }-${ i }` }
-                                className={ `relative flex w-14 h-48 shrink-0 flex-col border-t-3 ${ i == 0  ? 'border-l-3' : '' } ${ i == (NOTES.length * 2) - 1  ? 'border-r-3' : '' }` }
+                                className={ `relative flex w-14 h-48 shrink-0 flex-col border-t-3 ${ i == 0 ? 'border-l-3' : '' } ${ i == (NOTES.length * 2) - 1 ? 'border-r-3' : '' }` }
                             >
                                 {/* WHITE KEY */ }
                                 <button
                                     onMouseDown={ () => handleNoteClick(i) }
                                     className={ `
-                                        h-full w-full rounded-b-xs transition-colors duration-200 cursor-pointer
+                                        h-full w-full rounded-b-xs transition-colors duration-200 cursor-pointer border
                                         
-                                        /* Base (Light Theme): Ivory */
-                                        bg-[#FFFFF0] hover:bg-white active:bg-[#F0F0E0]
-                                        border-black border
-
-                                        /* Dark Theme Override */
-                                        in-[.dark]:bg-zinc-800 
-                                        in-[.dark]:hover:bg-zinc-700 
-                                        in-[.dark]:active:bg-zinc-900
-                                        in-[.dark]:border-zinc-600
-
-                                        /* High Contrast Override */
-                                        [*[data-theme=contrast]_&]:bg-black
-                                        [*[data-theme=contrast]_&]:border
-                                        [*[data-theme=contrast]_&]:border-white
-                                        [*[data-theme=contrast]_&]:active:bg-zinc-900
+                                        bg-key-white-bg 
+                                        border-key-white-border
+                                        active:bg-key-white-active
+                                        hover:opacity-90
                                     ` }
                                 />
 
@@ -106,22 +95,11 @@ export default function Synth() {
                                         } }
                                         className={ `
                                             absolute left-full top-0 z-10 -translate-x-1/2 h-3/5 w-2/3 rounded-b-xs shadow-md
-                                            transition-colors duration-200 cursor-pointer
+                                            transition-colors duration-200 cursor-pointer border
                                             
-                                            /* Base (Light Theme): Ebony */
-                                            bg-zinc-800 active:bg-zinc-700
-                                            border-black border
-                                            
-                                            /* Dark Theme Override */
-                                            in-[.dark]:bg-black 
-                                            in-[.dark]:active:bg-zinc-900
-                                            in-[.dark]:border in-[.dark]:border-zinc-600
-
-                                            /* High Contrast Override */
-                                            [*[data-theme=contrast]_&]:bg-cyan-400
-                                            [*[data-theme=contrast]_&]:border-2 
-                                            [*[data-theme=contrast]_&]:border-white
-                                            [*[data-theme=contrast]_&]:active:bg-white
+                                            bg-key-black-bg 
+                                            border-key-black-border
+                                            active:bg-key-black-active
                                         ` }
                                         style={ { width: '60%' } }
                                     />

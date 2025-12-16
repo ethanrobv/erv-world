@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-    /* 1. Map Tailwind utilities to semantic variables */
     --color-page: var(--bg-page);
     --color-surface: var(--bg-surface);
     --color-surface-highlight: var(--bg-surface-highlight);
@@ -13,6 +12,15 @@
 
     --color-primary: var(--brand-primary);
     --color-primary-fg: var(--brand-primary-fg);
+
+    /* Synth Widget */
+    --color-key-white-bg: var(--key-white-bg);
+    --color-key-white-active: var(--key-white-active);
+    --color-key-white-border: var(--key-white-border);
+
+    --color-key-black-bg: var(--key-black-bg);
+    --color-key-black-active: var(--key-black-active);
+    --color-key-black-border: var(--key-black-border);
 }
 
 /* 2. Default (Light) Theme */
@@ -28,6 +36,14 @@
 
     --brand-primary: #18181b;
     --brand-primary-fg: #ffffff;
+
+    /* Synth Widget */
+    --key-white-bg: #FFFFF0;
+    --key-white-active: #F0F0E0;
+    --key-white-border: #000000;
+    --key-black-bg: #27272a;
+    --key-black-active: #3f3f46;
+    --key-black-border: #000000;
 }
 
 /* 3. Dark Theme */
@@ -43,6 +59,14 @@
 
     --brand-primary: #f4f4f5;
     --brand-primary-fg: #09090b;
+
+    /* Synth Widget */
+    --key-white-bg: #27272a;
+    --key-white-active: #18181b;
+    --key-white-border: #52525b;
+    --key-black-bg: #000000;
+    --key-black-active: #18181b;
+    --key-black-border: #52525b;
 }
 
 /* 4. High Contrast Theme */
@@ -58,4 +82,57 @@
 
     --brand-primary: #00ffff;
     --brand-primary-fg: #000000;
+
+    /* Synth Widget */
+    --key-white-bg: #000000;
+    --key-white-active: #1a1a1a;
+    --key-white-border: #ffffff;
+    --key-black-bg: #22d3ee;
+    --key-black-active: #ffffff;
+    --key-black-border: #ffffff;
+}
+
+:root[data-theme="terminal"] {
+    --bg-page: #000000;
+    --bg-surface: #0c0c0c;
+    --bg-surface-highlight: #001a00;
+
+    --text-main: #4ade80;
+    --text-muted: #166534;
+
+    --border-base: #22c55e;
+
+    --brand-primary: #4ade80;
+    --brand-primary-fg: #000000;
+
+    /* Synth Widget */
+    --key-white-bg: #000000;
+    --key-white-active: #003300;
+    --key-white-border: #4ade80;
+    --key-black-bg: #15803d;
+    --key-black-active: #4ade80;
+    --key-black-border: #22c55e;
+}
+
+:root[data-theme="catppuccin"] {
+    --bg-page: #1e1e2e;              /* Base */
+    --bg-surface: #181825;           /* Mantle */
+    --bg-surface-highlight: #313244; /* Surface0 */
+
+    --text-main: #cdd6f4;            /* Text */
+    --text-muted: #a6adc8;           /* Subtext0 */
+
+    --border-base: #45475a;          /* Surface1 */
+
+    --brand-primary: #cba6f7;        /* Mauve */
+    --brand-primary-fg: #1e1e2e;     /* Base */
+
+    /* Synth Widget */
+    --key-white-bg: #cdd6f4;         /* Text (acting as white) */
+    --key-white-active: #b4befe;     /* Lavender */
+    --key-white-border: #45475a;     /* Surface1 */
+
+    --key-black-bg: #11111b;         /* Crust */
+    --key-black-active: #1e1e2e;     /* Base */
+    --key-black-border: #45475a;     /* Surface1 */
 }

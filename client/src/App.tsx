@@ -1,38 +1,69 @@
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './Home';
-import { useWidgets } from './context/WidgetContext';
+import { useWidgets, type WidgetType } from './context/WidgetContext';
 import FloatingWindow from './components/FloatingWindow';
 import Synth from './components/Synth';
+import BartenderGame from './components/Game.tsx';
 
 const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className='flex min-h-[60vh] items-center justify-center text-zinc-500 dark:text-zinc-400'>
-    <h1 className='text-2xl font-semibold'>{ title } Page</h1>
-  </div>
+    <div className='flex min-h-[60vh] items-center justify-center text-zinc-500 dark:text-zinc-400'>
+        <h1 className='text-2xl font-semibold'>{ title } Page</h1>
+    </div>
 );
 
+const getCenteredPos = (w: number, h: number) => {
+    if (typeof window === 'undefined') return { x: 50, y: 50 }; // Safety for SSR
+    return {
+        x: Math.max(0, (window.innerWidth - w) / 2),
+        y: Math.max(0, (window.innerHeight - h) / 2)
+    };
+};
+
 export default function App() {
-  const { isWidgetOpen, closeWidget } = useWidgets();
+    const { isWidgetOpen, closeWidget, activeWidgets, bringToFront } = useWidgets();
 
-  return (
-    <div className='min-h-screen bg-page text-text-main transition-colors duration-300'>
-      <Navbar/>
-      <Routes>
-        <Route path='/' element={ <Home/> }/>
-        <Route path='/about' element={ <PlaceholderPage title='About'/> }/>
-        <Route path='/login' element={ <PlaceholderPage title='Login'/> }/>
-      </Routes>
+    const SYNTH_SIZE = { width: 1000, height: 400 };
+    const BAR_GAME_SIZE = { width: 900, height: 750 };
 
-      { isWidgetOpen('synth') && (
-        <FloatingWindow
-          title='Synthesizer'
-          onClose={ () => closeWidget('synth') }
-          initialPosition={ { x: 50, y: 120 } }
-          initialSize={ { width: 1000, height: 400 } }
-        >
-          <Synth/>
-        </FloatingWindow>
-      ) }
-    </div>
-  );
+    const getZIndex = (id: WidgetType) => {
+        const index = activeWidgets.indexOf(id);
+        return index === -1 ? 10 : 10 + index;
+    };
+
+    return (
+        <div className='min-h-screen bg-page text-text-main transition-colors duration-300'>
+            <Navbar/>
+            <Routes>
+                <Route path='/' element={ <Home/> }/>
+                <Route path='/about' element={ <PlaceholderPage title='About'/> }/>
+                <Route path='/login' element={ <PlaceholderPage title='Login'/> }/>
+            </Routes>
+
+            { isWidgetOpen('synth') && (
+                <FloatingWindow
+                    title='Synthesizer'
+                    onClose={ () => closeWidget('synth') }
+                    initialPosition={ getCenteredPos(SYNTH_SIZE.width, SYNTH_SIZE.height) }
+                    initialSize={ SYNTH_SIZE }
+                    zIndex={ getZIndex('synth') }
+                    onFocus={ () => bringToFront('synth') }
+                >
+                    <Synth/>
+                </FloatingWindow>
+            ) }
+            { isWidgetOpen('barGame') && (
+                <FloatingWindow
+                    title='Fun'
+                    onClose={ () => closeWidget('barGame') }
+                    initialPosition={ getCenteredPos(BAR_GAME_SIZE.width, BAR_GAME_SIZE.height) }
+                    initialSize={ BAR_GAME_SIZE }
+                    zIndex={ getZIndex('barGame') }
+                    onFocus={ () => bringToFront('barGame') }
+                >
+                    <BartenderGame/>
+                </FloatingWindow>
+            ) }
+        </div>
+    );
 }

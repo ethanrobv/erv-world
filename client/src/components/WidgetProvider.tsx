@@ -26,15 +26,24 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
 
     const isWidgetOpen = (widget: WidgetType) => activeWidgets.includes(widget);
 
+    const bringToFront = (widget: WidgetType) => {
+        setActiveWidgets((prev) => {
+            if (!prev.includes(widget)) return prev;
+            const others = prev.filter((w) => w !== widget);
+            return [...others, widget];
+        });
+    };
+
     return (
-        <WidgetContext.Provider value={{
+        <WidgetContext.Provider value={ {
             activeWidgets,
+            bringToFront,
             openWidget,
             closeWidget,
             toggleWidget,
             isWidgetOpen
-        }}>
-            {children}
+        } }>
+            { children }
         </WidgetContext.Provider>
     );
 }

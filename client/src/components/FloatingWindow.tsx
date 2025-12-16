@@ -1,26 +1,40 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode, useLayoutEffect } from "react";
 import * as React from "react";
 
 interface FloatingWindowProps {
     title: string;
     children: ReactNode;
+    zIndex?: number;
+    onFocus?: () => void;
     initialPosition?: { x: number; y: number };
     initialSize?: { width: number; height: number };
     onClose?: () => void;
 }
 
 export default function FloatingWindow({
-    children,
-    initialPosition = { x: 250, y: 250 },
-    initialSize = { width: 500, height: 350 },
-    title,
-    onClose,
-}: FloatingWindowProps) {
+                                           children,
+                                           zIndex = 10,
+                                           onFocus,
+                                           initialPosition = { x: 250, y: 250 },
+                                           initialSize = { width: 500, height: 350 },
+                                           title,
+                                           onClose
+                                       }: FloatingWindowProps) {
     const [position, setPosition] = useState(initialPosition);
     const [size, setSize] = useState(initialSize);
 
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
+
+    useLayoutEffect(() => {
+        const navbar = document.getElementById("main-navbar");
+        if (navbar) {
+            const navbarHeight = navbar.offsetHeight;
+            if (position.y < navbarHeight) {
+                setPosition((prev) => ({ ...prev, y: navbarHeight + 10 }));
+            }
+        }
+    }, []);
 
     const actionStart = useRef<{
         startX: number;
@@ -29,6 +43,7 @@ export default function FloatingWindow({
         startTop: number;
         startWidth: number;
         startHeight: number;
+        minY: number;
     } | null>(null);
 
     const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -37,6 +52,9 @@ export default function FloatingWindow({
         e.preventDefault();
         setIsDragging(true);
 
+        const navbar = document.getElementById("main-navbar");
+        const currentNavbarHeight = navbar ? navbar.offsetHeight : 0;
+
         actionStart.current = {
             startX: e.clientX,
             startY: e.clientY,
@@ -44,6 +62,7 @@ export default function FloatingWindow({
             startTop: position.y,
             startWidth: 0,
             startHeight: 0,
+            minY: currentNavbarHeight,
         };
     };
 
@@ -59,6 +78,7 @@ export default function FloatingWindow({
             startTop: 0,
             startWidth: size.width,
             startHeight: size.height,
+            minY: 0,
         };
     };
 
@@ -83,6 +103,8 @@ export default function FloatingWindow({
                 const maxX = viewportW - size.width;
                 const maxY = viewportH - size.height;
 
+                const minY = actionStart.current.minY;
+
                 const dx = e.clientX - actionStart.current.startX;
                 const dy = e.clientY - actionStart.current.startY;
 
@@ -91,7 +113,7 @@ export default function FloatingWindow({
 
                 // Clamp values
                 newX = Math.max(0, Math.min(newX, maxX));
-                newY = Math.max(0, Math.min(newY, maxY));
+                newY = Math.max(minY, Math.min(newY, maxY));
 
                 setPosition({ x: newX, y: newY });
             }
@@ -120,8 +142,10 @@ export default function FloatingWindow({
                 height: size.height,
                 left: 0,
                 top: 0,
+                zIndex: zIndex,
                 transform: `translate(${ position.x }px, ${ position.y }px)`,
             } }
+            onMouseDownCapture={ onFocus }
         >
             {/* Header / Drag Handle */ }
             <div
@@ -134,7 +158,7 @@ export default function FloatingWindow({
                 { onClose && (
                     <button
                         onClick={ onClose }
-                        className="flex size-6 items-center justify-center font-bold rounded-md text-xl text-text-muted hover:bg-pink-500 hover:text-white transition-colors"
+                        className="flex size-6 items-center justify-center font-bold rounded-md text-xl text-text-muted hover:bg-primary hover:text-white transition-colors"
                         aria-label="Close"
                     >
                         &times;
