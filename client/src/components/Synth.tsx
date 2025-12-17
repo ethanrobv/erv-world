@@ -30,11 +30,11 @@ export default function Synth() {
     };
 
     return (
-        <div className="flex h-full flex-col gap-4">
+        <div className='flex h-full flex-col gap-4'>
 
             {/* Controls */ }
             <div className={ themeClasses.controlsContainer }>
-                <div className="flex items-center gap-2">
+                <div className='flex items-center gap-2'>
                     <button onClick={ () => setOctave(o => Math.max(1, o - 1)) } className={ themeClasses.button }>
                         - Oct
                     </button>
@@ -58,10 +58,10 @@ export default function Synth() {
                 </div>
             </div>
 
-            {/* Keys Container Wrapper - Centers the piano if screen is wide enough */ }
-            <div className="flex justify-center w-full">
+            {/* Keys Container Wrapper */ }
+            <div className='flex justify-center w-full'>
                 <div
-                    className="relative flex select-none overflow-x-auto overflow-y-hidden rounded-md bg-zinc-400 ring-1 ring-border-base w-fit max-w-full in-[.dark]:bg-zinc-950">
+                    className='relative flex select-none overflow-x-auto overflow-y-hidden rounded-md bg-zinc-400 ring-1 ring-border-base w-fit max-w-full in-[.dark]:bg-zinc-950'>
                     { DOUBLE_SCALE.map((note, i) => {
                         if (note.includes('#')) return null;
 

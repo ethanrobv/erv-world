@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
     --color-page: var(--bg-page);
@@ -44,10 +44,16 @@
     --key-black-bg: #27272a;
     --key-black-active: #3f3f46;
     --key-black-border: #000000;
+
+    /* Game Assets */
+    --game-wood: #8b5a2b; /* Warm Brown */
+    --game-metal: #1a1a1a; /* Dark Grey */
+    --game-shirt-smoker: #34495e; /* Slate Blue */
+    --game-pants: #222222; /* Black */
 }
 
 /* 3. Dark Theme */
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
     --bg-page: #09090b;
     --bg-surface: #18181b;
     --bg-surface-highlight: #27272a;
@@ -67,10 +73,16 @@
     --key-black-bg: #000000;
     --key-black-active: #18181b;
     --key-black-border: #52525b;
+
+    /* Game Assets */
+    --game-wood: #5d4037; /* Darker Brown */
+    --game-metal: #000000; /* Pure Black */
+    --game-shirt-smoker: #4a6fa5; /* Muted Blue */
+    --game-pants: #111111; /* Dark Grey */
 }
 
 /* 4. High Contrast Theme */
-:root[data-theme="contrast"] {
+:root[data-theme='contrast'] {
     --bg-page: #000000;
     --bg-surface: #000000;
     --bg-surface-highlight: #1a1a1a;
@@ -90,9 +102,15 @@
     --key-black-bg: #22d3ee;
     --key-black-active: #ffffff;
     --key-black-border: #ffffff;
+
+    /* Game Assets */
+    --game-wood: #fc4233;
+    --game-metal: #ffffff;
+    --game-shirt-smoker: #363232;
+    --game-pants: #1a1a1a;
 }
 
-:root[data-theme="terminal"] {
+:root[data-theme='terminal'] {
     --bg-page: #000000;
     --bg-surface: #0c0c0c;
     --bg-surface-highlight: #001a00;
@@ -112,27 +130,39 @@
     --key-black-bg: #15803d;
     --key-black-active: #4ade80;
     --key-black-border: #22c55e;
+
+    /* Game Assets */
+    --game-wood: #14532d;
+    --game-metal: #000000;
+    --game-shirt-smoker: #22c55e;
+    --game-pants: #052e16;
 }
 
-:root[data-theme="catppuccin"] {
-    --bg-page: #1e1e2e;              /* Base */
-    --bg-surface: #181825;           /* Mantle */
-    --bg-surface-highlight: #313244; /* Surface0 */
+:root[data-theme='catppuccin'] {
+    --bg-page: #1e1e2e;
+    --bg-surface: #181825;
+    --bg-surface-highlight: #313244;
 
-    --text-main: #cdd6f4;            /* Text */
-    --text-muted: #a6adc8;           /* Subtext0 */
+    --text-main: #cdd6f4;
+    --text-muted: #a6adc8;
 
-    --border-base: #45475a;          /* Surface1 */
+    --border-base: #45475a;
 
-    --brand-primary: #cba6f7;        /* Mauve */
-    --brand-primary-fg: #1e1e2e;     /* Base */
+    --brand-primary: #cba6f7;
+    --brand-primary-fg: #1e1e2e;
 
     /* Synth Widget */
-    --key-white-bg: #cdd6f4;         /* Text (acting as white) */
-    --key-white-active: #b4befe;     /* Lavender */
-    --key-white-border: #45475a;     /* Surface1 */
+    --key-white-bg: #cdd6f4;
+    --key-white-active: #b4befe;
+    --key-white-border: #45475a;
 
-    --key-black-bg: #11111b;         /* Crust */
-    --key-black-active: #1e1e2e;     /* Base */
-    --key-black-border: #45475a;     /* Surface1 */
+    --key-black-bg: #11111b;
+    --key-black-active: #1e1e2e;
+    --key-black-border: #45475a;
+
+    /* Game Assets */
+    --game-wood: #fab387;
+    --game-metal: #11111b;
+    --game-shirt-smoker: #89b4fa;
+    --game-pants: #181825;
 }

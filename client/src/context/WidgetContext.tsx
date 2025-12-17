@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-export type WidgetType = 'synth' | 'barGame' | 'settings';
+export type WidgetType = 'synth' | 'game' | 'settings';
 
 interface WidgetContextType {
     activeWidgets: WidgetType[];

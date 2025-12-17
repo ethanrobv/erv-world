@@ -4,7 +4,7 @@ import Home from './Home';
 import { useWidgets, type WidgetType } from './context/WidgetContext';
 import FloatingWindow from './components/FloatingWindow';
 import Synth from './components/Synth';
-import BartenderGame from './components/Game.tsx';
+import Game from './components/Game.tsx';
 
 const PlaceholderPage = ({ title }: { title: string }) => (
     <div className='flex min-h-[60vh] items-center justify-center text-zinc-500 dark:text-zinc-400'>
@@ -24,7 +24,7 @@ export default function App() {
     const { isWidgetOpen, closeWidget, activeWidgets, bringToFront } = useWidgets();
 
     const SYNTH_SIZE = { width: 1000, height: 400 };
-    const BAR_GAME_SIZE = { width: 900, height: 750 };
+    const GAME_SIZE = { width: 900, height: 750 };
 
     const getZIndex = (id: WidgetType) => {
         const index = activeWidgets.indexOf(id);
@@ -52,16 +52,16 @@ export default function App() {
                     <Synth/>
                 </FloatingWindow>
             ) }
-            { isWidgetOpen('barGame') && (
+            { isWidgetOpen('game') && (
                 <FloatingWindow
-                    title='Fun'
-                    onClose={ () => closeWidget('barGame') }
-                    initialPosition={ getCenteredPos(BAR_GAME_SIZE.width, BAR_GAME_SIZE.height) }
-                    initialSize={ BAR_GAME_SIZE }
-                    zIndex={ getZIndex('barGame') }
-                    onFocus={ () => bringToFront('barGame') }
+                    title='demo'
+                    onClose={ () => closeWidget('game') }
+                    initialPosition={ getCenteredPos(GAME_SIZE.width, GAME_SIZE.height) }
+                    initialSize={ GAME_SIZE }
+                    zIndex={ getZIndex('game') }
+                    onFocus={ () => bringToFront('game') }
                 >
-                    <BartenderGame/>
+                    <Game/>
                 </FloatingWindow>
             ) }
         </div>

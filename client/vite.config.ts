@@ -8,6 +8,26 @@ export default defineConfig({
         react(),
         tailwindcss()
     ],
+    build: {
+        rolldownOptions: {
+            output: {
+                advancedChunks: {
+                    groups: [
+                        {
+                            name: 'vendor-three',
+                            test: /node_modules\/(@?react-three|three|@react-three\/postprocessing)/,
+                            priority: 10,
+                        },
+                        {
+                            name: 'vendor-react',
+                            test: /node_modules\/(react|react-dom|scheduler)/,
+                            priority: 5,
+                        },
+                    ]
+                }
+            }
+        }
+    },
     server: {
         proxy: {
             '/api': {

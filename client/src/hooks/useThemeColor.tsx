@@ -13,7 +13,7 @@ export function useThemeColor(variableName: string) {
         // Update immediately on mount in case it changed
         setColor(getColor());
 
-        // Watch the <html> tag for attribute changes (specifically data-theme)
+        // Watch the <html> tag for attribute changes
         const observer = new MutationObserver(() => {
             setColor(getColor());
         });
