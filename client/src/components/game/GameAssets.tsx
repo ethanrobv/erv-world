@@ -4,6 +4,10 @@ import { Text, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { useThemeColor } from '../../hooks/useThemeColor';
 
+/* -------------------------------------------------------------------------- */
+/* BASE COMPONENTS                                                            */
+/* -------------------------------------------------------------------------- */
+
 export const SoftBlock = ({
                               args,
                               color,
@@ -38,12 +42,9 @@ export const SoftBlock = ({
     </RoundedBox>
 );
 
-export const SimpleBottle = ({ position, width, height, color }: any) => (
-    <mesh position={ position } castShadow>
-        <boxGeometry args={ [width, height, width] }/>
-        <meshStandardMaterial color={ color } transparent opacity={ 0.8 } roughness={ 0.2 } metalness={ 0.1 }/>
-    </mesh>
-);
+/* -------------------------------------------------------------------------- */
+/* ENVIRONMENT & ARCHITECTURE                                                 */
+/* -------------------------------------------------------------------------- */
 
 export const Floor = ({ colorOverride }: { colorOverride?: string }) => {
     const defaultColor = useThemeColor('--bg-surface');
@@ -85,17 +86,36 @@ export const PortalDoor = ({ position, rotation = [0, 0, 0], label, isOpen }: {
             </group>
             <group position={ [0, 3.8, 0.2] }>
                 <SoftBlock args={ [1.6, 0.6, 0.1] } color={ signBg }/>
-                <Text position={ [0, 0, 0.06] } fontSize={ 0.35 }
-                      font='https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff' anchorX='center'
-                      anchorY='middle'>
+                <Text
+                    position={ [0, 0, 0.06] }
+                    fontSize={ 0.35 }
+                    font='https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff'
+                    anchorX='center'
+                    anchorY='middle'
+                >
                     { label }
-                    <meshStandardMaterial color={ textColor } emissive={ textColor } emissiveIntensity={ 4 }
-                                          toneMapped={ false }/>
+                    <meshStandardMaterial
+                        color={ textColor }
+                        emissive={ textColor }
+                        emissiveIntensity={ 4 }
+                        toneMapped={ false }
+                    />
                 </Text>
             </group>
         </group>
     );
 };
+
+/* -------------------------------------------------------------------------- */
+/* PROPS & FURNITURE                                                          */
+/* -------------------------------------------------------------------------- */
+
+export const SimpleBottle = ({ position, width, height, color }: any) => (
+    <mesh position={ position } castShadow>
+        <boxGeometry args={ [width, height, width] }/>
+        <meshStandardMaterial color={ color } transparent opacity={ 0.8 } roughness={ 0.2 } metalness={ 0.1 }/>
+    </mesh>
+);
 
 export const Dumpster = ({ position, rotation = [0, 0, 0] }: {
     position: [number, number, number],
@@ -106,9 +126,7 @@ export const Dumpster = ({ position, rotation = [0, 0, 0] }: {
 
     return (
         <group position={ position } rotation={ rotation }>
-            {/* Main Body */ }
             <SoftBlock args={ [2.5, 1.5, 1.5] } color={ mainColor } position={ [0, 0.75, 0] }/>
-            {/* Lid */ }
             <SoftBlock args={ [2.6, 0.2, 1.6] } color={ lidColor } position={ [0, 1.6, 0] } rotation={ [0.1, 0, 0] }/>
         </group>
     );
@@ -120,7 +138,6 @@ export const CardboardBox = ({ position, rotation = [0, 0, 0], size = 0.8 }: {
     size?: number
 }) => {
     const boxColor = useThemeColor('--game-wood');
-
     return (
         <SoftBlock args={ [size, size, size] } color={ boxColor } position={ position } rotation={ rotation }/>
     );
@@ -135,17 +152,17 @@ export const Bench = ({ position, rotation = [0, 0, 0] }: {
 
     return (
         <group position={ position } rotation={ rotation }>
-            {/* Seat Surface at Y=0.5 */ }
             <SoftBlock args={ [2.5, 0.1, 0.8] } color={ woodColor } position={ [0, 0.5, 0] }/>
-            {/* Backrest */ }
             <SoftBlock args={ [2.5, 0.6, 0.1] } color={ woodColor } position={ [0, 1.0, -0.35] }/>
-
-            {/* Legs */ }
             <SoftBlock args={ [0.15, 0.5, 0.8] } color={ legColor } position={ [-1.1, 0.25, 0] }/>
             <SoftBlock args={ [0.15, 0.5, 0.8] } color={ legColor } position={ [1.1, 0.25, 0] }/>
         </group>
     );
 };
+
+/* -------------------------------------------------------------------------- */
+/* CHARACTERS                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export const Bartender = ({ position, rotation = [0, 0, 0] }: {
     position: [number, number, number],
@@ -160,7 +177,6 @@ export const Bartender = ({ position, rotation = [0, 0, 0] }: {
     useFrame((state) => {
         if (groupRef.current) {
             const time = state.clock.elapsedTime;
-            // Idle animation
             groupRef.current.position.y = position[1] + Math.sin(time * 2) * 0.015;
             groupRef.current.rotation.y = rotation[1] + Math.sin(time * 0.7) * 0.15;
         }
@@ -168,17 +184,12 @@ export const Bartender = ({ position, rotation = [0, 0, 0] }: {
 
     return (
         <group position={ position } rotation={ rotation } ref={ groupRef }>
-            {/* Head */ }
             <SoftBlock args={ [0.5, 0.5, 0.5] } color={ skinColor } position={ [0, 1.45, 0] }/>
-
-            {/* Torso */ }
             <SoftBlock args={ [0.6, 0.7, 0.4] } color={ shirtColor } position={ [0, 0.85, 0] }/>
 
-            {/* Apron */ }
             <SoftBlock args={ [0.62, 0.5, 0.05] } color={ apronColor } position={ [0, 0.7, 0.21] }/>
             <SoftBlock args={ [0.4, 0.3, 0.05] } color={ apronColor } position={ [0, 1.05, 0.21] }/>
 
-            {/* Arms */ }
             <group position={ [-0.38, 1.15, 0] }>
                 <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }/>
             </group>
@@ -186,7 +197,6 @@ export const Bartender = ({ position, rotation = [0, 0, 0] }: {
                 <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }/>
             </group>
 
-            {/* Legs */ }
             <group position={ [-0.15, 0.5, 0] }>
                 <SoftBlock args={ [0.2, 0.5, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
             </group>
@@ -197,7 +207,73 @@ export const Bartender = ({ position, rotation = [0, 0, 0] }: {
     );
 };
 
-// Smoke Particle System
+export const AlleySmoker = ({ position, rotation = [0, 0, 0] }: {
+    position: [number, number, number],
+    rotation?: [number, number, number]
+}) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const skinColor = useThemeColor('--border-base');
+    const shirtColor = useThemeColor('--game-shirt-smoker');
+    const pantsColor = useThemeColor('--game-pants');
+
+    useFrame((state) => {
+        if (groupRef.current) {
+            const time = state.clock.elapsedTime;
+            groupRef.current.position.y = position[1] + Math.sin(time * 1.5) * 0.005;
+        }
+    });
+
+    return (
+        <group position={ position } rotation={ rotation } ref={ groupRef }>
+            <group position={ [0, -0.1, 0] }>
+                {/* Body Parts */ }
+                <SoftBlock args={ [0.5, 0.5, 0.5] } color={ skinColor } position={ [0, 1.3, 0] }/>
+                <SoftBlock args={ [0.6, 0.7, 0.4] } color={ shirtColor } position={ [0, 0.7, 0] }/>
+
+                {/* Left Arm */ }
+                <group position={ [-0.38, 1, 0] } rotation={ [0, 0, 0] }>
+                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }/>
+                </group>
+
+                {/* Right Arm & Cigarette */ }
+                <group position={ [0.38, 1., 0] } rotation={ [-1.2, -0.2, -0.2] }>
+                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }/>
+                    <group position={ [0, -0.5, 0] } rotation={ [1.4, 0, 0] }>
+                        <mesh position={ [0, 0.06, 0] }>
+                            <boxGeometry args={ [0.03, 0.12, 0.03] }/>
+                            <meshStandardMaterial color='#ddd'/>
+                        </mesh>
+                        <group position={ [0, 0.13, 0] }>
+                            <mesh>
+                                <boxGeometry args={ [0.035, 0.03, 0.035] }/>
+                                <meshStandardMaterial
+                                    color='#ff5500'
+                                    emissive='#ff3300'
+                                    emissiveIntensity={ 6 }
+                                    toneMapped={ false }
+                                />
+                            </mesh>
+                            <SmokeParticles/>
+                        </group>
+                    </group>
+                </group>
+
+                {/* Legs */ }
+                <group position={ [-0.15, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
+                    <SoftBlock args={ [0.2, 0.8, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
+                </group>
+                <group position={ [0.15, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
+                    <SoftBlock args={ [0.2, 0.8, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
+                </group>
+            </group>
+        </group>
+    );
+};
+
+/* -------------------------------------------------------------------------- */
+/* EFFECTS & PARTICLES                                                        */
+/* -------------------------------------------------------------------------- */
+
 const SmokeParticles = () => {
     const groupRef = useRef<THREE.Group>(null);
     const particles = useRef<(THREE.Mesh | null)[]>([]);
@@ -218,7 +294,7 @@ const SmokeParticles = () => {
             const duration = 2.0;
             const offset = i * (duration / count);
             const t = (time + offset) % duration;
-            const pct = t / duration; // 0 to 1
+            const pct = t / duration;
 
             const rise = pct * 0.5;
             const worldY = new THREE.Vector3(0, rise, 0);
@@ -254,77 +330,6 @@ const SmokeParticles = () => {
                     />
                 </mesh>
             )) }
-        </group>
-    );
-};
-
-export const AlleySmoker = ({ position, rotation = [0, 0, 0] }: {
-    position: [number, number, number],
-    rotation?: [number, number, number]
-}) => {
-    const groupRef = useRef<THREE.Group>(null);
-    const skinColor = useThemeColor('--border-base');
-    const shirtColor = useThemeColor('--game-shirt-smoker');
-    const pantsColor = useThemeColor('--game-pants');
-
-    useFrame((state) => {
-        if (groupRef.current) {
-            const time = state.clock.elapsedTime;
-            // Very subtle idle bobbing
-            groupRef.current.position.y = position[1] + Math.sin(time * 1.5) * 0.005;
-        }
-    });
-
-    return (
-        <group position={ position } rotation={ rotation } ref={ groupRef }>
-            <group position={ [0, -0.1, 0] }>
-
-                {/* Head */ }
-                <SoftBlock args={ [0.5, 0.5, 0.5] } color={ skinColor } position={ [0, 1.3, 0] }/>
-
-                {/* Torso */ }
-                <SoftBlock args={ [0.6, 0.7, 0.4] } color={ shirtColor } position={ [0, 0.7, 0] }/>
-
-                {/* Left Arm */ }
-                <group position={ [-0.38, 1, 0] } rotation={ [0, 0, 0] }>
-                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }/>
-                </group>
-
-                {/* Right Arm */ }
-                <group position={ [0.38, 1., 0] } rotation={ [-1.2, -0.2, -0.2] }>
-                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }/>
-
-                    {/* Cigarette */ }
-                    <group position={ [0, -0.5, 0] } rotation={ [1.4, 0, 0] }>
-                        <mesh position={ [0, 0.06, 0] }>
-                            <boxGeometry args={ [0.03, 0.12, 0.03] }/>
-                            <meshStandardMaterial color='#ddd'/>
-                        </mesh>
-                        <group position={ [0, 0.13, 0] }>
-                            <mesh>
-                                <boxGeometry args={ [0.035, 0.03, 0.035] }/>
-                                <meshStandardMaterial
-                                    color='#ff5500'
-                                    emissive='#ff3300'
-                                    emissiveIntensity={ 6 }
-                                    toneMapped={ false }
-                                />
-                            </mesh>
-                            <SmokeParticles/>
-                        </group>
-                    </group>
-                </group>
-
-                {/* Left Leg */ }
-                <group position={ [-0.15, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
-                    <SoftBlock args={ [0.2, 0.8, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
-                </group>
-
-                {/* Right Leg */ }
-                <group position={ [0.15, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
-                    <SoftBlock args={ [0.2, 0.8, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
-                </group>
-            </group>
         </group>
     );
 };

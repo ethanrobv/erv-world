@@ -4,7 +4,11 @@ import Home from './Home';
 import { useWidgets, type WidgetType } from './context/WidgetContext';
 import FloatingWindow from './components/FloatingWindow';
 import Synth from './components/Synth';
-import Game from './components/Game.tsx';
+import Game from './components/Game';
+
+/* -------------------------------------------------------------------------- */
+/* HELPERS & UTILS                                                            */
+/* -------------------------------------------------------------------------- */
 
 const PlaceholderPage = ({ title }: { title: string }) => (
     <div className='flex min-h-[60vh] items-center justify-center text-zinc-500 dark:text-zinc-400'>
@@ -13,16 +17,21 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 );
 
 const getCenteredPos = (w: number, h: number) => {
-    if (typeof window === 'undefined') return { x: 50, y: 50 }; // Safety for SSR
+    if (typeof window === 'undefined') return { x: 50, y: 50 };
     return {
         x: Math.max(0, (window.innerWidth - w) / 2),
         y: Math.max(0, (window.innerHeight - h) / 2)
     };
 };
 
+/* -------------------------------------------------------------------------- */
+/* MAIN COMPONENT                                                             */
+/* -------------------------------------------------------------------------- */
+
 export default function App() {
     const { isWidgetOpen, closeWidget, activeWidgets, bringToFront } = useWidgets();
 
+    // Widget Configurations
     const SYNTH_SIZE = { width: 1000, height: 400 };
     const GAME_SIZE = { width: 900, height: 750 };
 
@@ -34,12 +43,15 @@ export default function App() {
     return (
         <div className='min-h-screen bg-page text-text-main transition-colors duration-300'>
             <Navbar/>
+
+            {/* Main Content Routes */ }
             <Routes>
                 <Route path='/' element={ <Home/> }/>
                 <Route path='/about' element={ <PlaceholderPage title='About'/> }/>
                 <Route path='/login' element={ <PlaceholderPage title='Login'/> }/>
             </Routes>
 
+            {/* Widget Overlays */ }
             { isWidgetOpen('synth') && (
                 <FloatingWindow
                     title='Synthesizer'
@@ -52,6 +64,7 @@ export default function App() {
                     <Synth/>
                 </FloatingWindow>
             ) }
+
             { isWidgetOpen('game') && (
                 <FloatingWindow
                     title='demo'

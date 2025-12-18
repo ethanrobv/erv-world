@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, type ReactNode, useLayoutEffect } from 'react';
 import * as React from 'react';
 
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+
+/* -------------------------------------------------------------------------- */
+
 interface FloatingWindowProps {
     title: string;
     children: ReactNode;
@@ -11,6 +16,10 @@ interface FloatingWindowProps {
     onClose?: () => void;
 }
 
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function FloatingWindow({
                                            children,
                                            zIndex = 10,
@@ -20,26 +29,15 @@ export default function FloatingWindow({
                                            title,
                                            onClose
                                        }: FloatingWindowProps) {
+    // State
     const [position, setPosition] = useState(initialPosition);
     const [size, setSize] = useState(initialSize);
-
     const [isMaximized, setIsMaximized] = useState(false);
-
-    const preMaximizeState = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
-
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
 
-    useLayoutEffect(() => {
-        const navbar = document.getElementById('main-navbar');
-        if (navbar) {
-            const navbarHeight = navbar.offsetHeight;
-            if (position.y < navbarHeight) {
-                setPosition((prev) => ({ ...prev, y: navbarHeight + 10 }));
-            }
-        }
-    }, []);
-
+    // Refs for state tracking during events
+    const preMaximizeState = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
     const actionStart = useRef<{
         startX: number;
         startY: number;
@@ -50,18 +48,37 @@ export default function FloatingWindow({
         minY: number;
     } | null>(null);
 
+    /* -------------------------------------------------------------------------- */
+    /* LIFECYCLE & INITIALIZATION                                                 */
+    /* -------------------------------------------------------------------------- */
+
+    useLayoutEffect(() => {
+        // Adjust initial position if it overlaps with the navbar
+        const navbar = document.getElementById('main-navbar');
+        if (navbar) {
+            const navbarHeight = navbar.offsetHeight;
+            if (position.y < navbarHeight) {
+                setPosition((prev) => ({ ...prev, y: navbarHeight + 10 }));
+            }
+        }
+    }, []);
+
+    /* -------------------------------------------------------------------------- */
+    /* HANDLERS: WINDOW CONTROL                                                   */
+    /* -------------------------------------------------------------------------- */
+
     const handleToggleMaximize = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent drag start when clicking button
+        e.stopPropagation();
 
         if (isMaximized) {
-            // Restore to previous state
+            // Restore
             if (preMaximizeState.current) {
                 setPosition({ x: preMaximizeState.current.x, y: preMaximizeState.current.y });
                 setSize({ width: preMaximizeState.current.width, height: preMaximizeState.current.height });
             }
             setIsMaximized(false);
         } else {
-            // Save window state for restoration from full screen
+            // Maximize
             preMaximizeState.current = { ...position, ...size };
 
             const navbar = document.getElementById('main-navbar');
@@ -69,15 +86,17 @@ export default function FloatingWindow({
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
 
-            // Expand to full screen minus navbar
             setPosition({ x: 0, y: navbarHeight });
             setSize({ width: windowWidth, height: windowHeight - navbarHeight });
             setIsMaximized(true);
         }
     };
 
+    /* -------------------------------------------------------------------------- */
+    /* HANDLERS: DRAG & RESIZE INPUT                                              */
+    /* -------------------------------------------------------------------------- */
+
     const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
-        // Prevent dragging if button clicked or if currently maximized
         if (isMaximized) return;
         if (e.target !== e.currentTarget && (e.target as HTMLElement).closest('button')) return;
 
@@ -99,7 +118,6 @@ export default function FloatingWindow({
     };
 
     const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
-        // Prevent resizing if maximized
         if (isMaximized) return;
 
         e.preventDefault();
@@ -117,6 +135,10 @@ export default function FloatingWindow({
         };
     };
 
+    /* -------------------------------------------------------------------------- */
+    /* EFFECTS: GLOBAL EVENT LISTENERS                                            */
+    /* -------------------------------------------------------------------------- */
+
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (!actionStart.current) return;
@@ -125,8 +147,8 @@ export default function FloatingWindow({
                 const dx = e.clientX - actionStart.current.startX;
                 const dy = e.clientY - actionStart.current.startY;
 
-                const newWidth = Math.max(actionStart.current.startWidth + dx, 250); // Min width 250
-                const newHeight = Math.max(actionStart.current.startHeight + dy, 150); // Min height 150
+                const newWidth = Math.max(actionStart.current.startWidth + dx, 250);
+                const newHeight = Math.max(actionStart.current.startHeight + dy, 150);
 
                 setSize({ width: newWidth, height: newHeight });
 
@@ -136,7 +158,6 @@ export default function FloatingWindow({
 
                 const maxX = viewportW - size.width;
                 const maxY = viewportH - size.height;
-
                 const minY = actionStart.current.minY;
 
                 const dx = e.clientX - actionStart.current.startX;
@@ -167,6 +188,10 @@ export default function FloatingWindow({
         };
     }, [isDragging, isResizing, size.width, size.height]);
 
+    /* -------------------------------------------------------------------------- */
+    /* RENDER                                                                     */
+    /* -------------------------------------------------------------------------- */
+
     return (
         <div
             className={ `fixed flex flex-col overflow-hidden rounded-xl border border-border-base bg-surface shadow-2xl transition-colors duration-300 ${ isMaximized ? 'rounded-none border-0' : '' }` }
@@ -184,28 +209,25 @@ export default function FloatingWindow({
             {/* Header / Drag Handle */ }
             <div
                 onMouseDown={ handleDragStart }
-                // Change cursor based on maximized state
                 className={ `flex items-center justify-between border-b border-border-base bg-surface-highlight px-4 py-2 select-none ${ isMaximized ? 'cursor-default' : 'cursor-move' }` }
-                onDoubleClick={ handleToggleMaximize } // Double click header to maximize
+                onDoubleClick={ handleToggleMaximize }
             >
                 <span className='text-sm font-semibold text-text-main'>{ title }</span>
 
                 <div className='flex items-center gap-2'>
-                    {/* Maximize / Restore Button */ }
+                    {/* Maximize / Restore Toggle */ }
                     <button
                         onClick={ handleToggleMaximize }
                         className='flex size-6 items-center justify-center rounded-md text-text-muted hover:bg-surface hover:text-text-main transition-colors'
                         aria-label={ isMaximized ? 'Restore' : 'Maximize' }
                     >
                         { isMaximized ? (
-                            // Restore Icon
                             <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'
                                  className='size-4'>
                                 <rect x='8' y='8' width='11' height='11' rx='1'/>
                                 <path d='M5 15H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1'/>
                             </svg>
                         ) : (
-                            // Maximize Icon
                             <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'
                                  className='size-4'>
                                 <rect x='5' y='5' width='14' height='14' rx='1'/>
@@ -226,7 +248,7 @@ export default function FloatingWindow({
                 </div>
             </div>
 
-            {/* Body Content */ }
+            {/* Window Content */ }
             <div className='flex-1 overflow-auto p-4 bg-surface text-text-main'>
                 { children }
             </div>
@@ -237,7 +259,6 @@ export default function FloatingWindow({
                     onMouseDown={ handleResizeStart }
                     className='absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none'
                 >
-                    {/* Visual indicator for the corner */ }
                     <svg
                         viewBox='0 0 24 24'
                         className='absolute bottom-1 right-1 size-3 text-text-muted opacity-50 pointer-events-none'

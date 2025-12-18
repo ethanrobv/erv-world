@@ -2,15 +2,27 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
-import App from './App.tsx';
-import { WidgetProvider } from './components/WidgetProvider.tsx';
+
+/* -------------------------------------------------------------------------- */
+/* APP & PROVIDERS                                                            */
+/* -------------------------------------------------------------------------- */
+
+import App from './App';
+import { WidgetProvider } from './components/WidgetProvider';
+import { NetworkProvider } from './components/NetworkProvider';
+
+/* -------------------------------------------------------------------------- */
+/* APP ENTRY POINT                                                            */
+/* -------------------------------------------------------------------------- */
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <BrowserRouter>
-            <WidgetProvider>
-                <App/>
-            </WidgetProvider>
+            <NetworkProvider>
+                <WidgetProvider>
+                    <App/>
+                </WidgetProvider>
+            </NetworkProvider>
         </BrowserRouter>
     </StrictMode>
 );

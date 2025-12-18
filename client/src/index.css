@@ -13,7 +13,7 @@
     --color-primary: var(--brand-primary);
     --color-primary-fg: var(--brand-primary-fg);
 
-    /* Synth Widget */
+    /* Widget: Synth */
     --color-key-white-bg: var(--key-white-bg);
     --color-key-white-active: var(--key-white-active);
     --color-key-white-border: var(--key-white-border);
@@ -23,21 +23,28 @@
     --color-key-black-border: var(--key-black-border);
 }
 
-/* 2. Default (Light) Theme */
+/* -------------------------------------------------------------------------- */
+/* BASE THEME (LIGHT)                                                         */
+/* -------------------------------------------------------------------------- */
+
 :root {
+    /* Layout Colors */
     --bg-page: #fffbf4;
     --bg-surface: #ffffff;
     --bg-surface-highlight: #f4f4f5;
 
+    /* Typography */
     --text-main: #18181b;
     --text-muted: #52525b;
 
+    /* Borders */
     --border-base: #e4e4e7;
 
+    /* Brand Identity */
     --brand-primary: #18181b;
     --brand-primary-fg: #ffffff;
 
-    /* Synth Widget */
+    /* Component: Synth Widget */
     --key-white-bg: #FFFFF0;
     --key-white-active: #F0F0E0;
     --key-white-border: #000000;
@@ -45,28 +52,35 @@
     --key-black-active: #3f3f46;
     --key-black-border: #000000;
 
-    /* Game Assets */
-    --game-wood: #8b5a2b; /* Warm Brown */
-    --game-metal: #1a1a1a; /* Dark Grey */
-    --game-shirt-smoker: #34495e; /* Slate Blue */
-    --game-pants: #222222; /* Black */
+    /* Component: Game Assets */
+    --game-wood: #8b5a2b;
+    --game-metal: #1a1a1a;
+    --game-shirt-smoker: #34495e;
+    --game-pants: #222222;
 }
 
-/* 3. Dark Theme */
+/* -------------------------------------------------------------------------- */
+/* DARK THEME                                                                 */
+/* -------------------------------------------------------------------------- */
+
 :root[data-theme='dark'] {
+    /* Layout Colors */
     --bg-page: #09090b;
     --bg-surface: #18181b;
     --bg-surface-highlight: #27272a;
 
+    /* Typography */
     --text-main: #f4f4f5;
     --text-muted: #a1a1aa;
 
+    /* Borders */
     --border-base: #27272a;
 
+    /* Brand Identity */
     --brand-primary: #f4f4f5;
     --brand-primary-fg: #09090b;
 
-    /* Synth Widget */
+    /* Component: Synth Widget */
     --key-white-bg: #27272a;
     --key-white-active: #18181b;
     --key-white-border: #52525b;
@@ -74,28 +88,35 @@
     --key-black-active: #18181b;
     --key-black-border: #52525b;
 
-    /* Game Assets */
-    --game-wood: #5d4037; /* Darker Brown */
-    --game-metal: #000000; /* Pure Black */
-    --game-shirt-smoker: #4a6fa5; /* Muted Blue */
-    --game-pants: #111111; /* Dark Grey */
+    /* Component: Game Assets */
+    --game-wood: #5d4037;
+    --game-metal: #000000;
+    --game-shirt-smoker: #4a6fa5;
+    --game-pants: #111111;
 }
 
-/* 4. High Contrast Theme */
+/* -------------------------------------------------------------------------- */
+/* HIGH CONTRAST THEME                                                        */
+/* -------------------------------------------------------------------------- */
+
 :root[data-theme='contrast'] {
+    /* Layout Colors */
     --bg-page: #000000;
     --bg-surface: #000000;
     --bg-surface-highlight: #1a1a1a;
 
+    /* Typography */
     --text-main: #ffffff;
     --text-muted: #ffffff;
 
+    /* Borders */
     --border-base: #ffffff;
 
+    /* Brand Identity */
     --brand-primary: #00ffff;
     --brand-primary-fg: #000000;
 
-    /* Synth Widget */
+    /* Component: Synth Widget */
     --key-white-bg: #000000;
     --key-white-active: #1a1a1a;
     --key-white-border: #ffffff;
@@ -103,27 +124,35 @@
     --key-black-active: #ffffff;
     --key-black-border: #ffffff;
 
-    /* Game Assets */
+    /* Component: Game Assets */
     --game-wood: #fc4233;
     --game-metal: #ffffff;
     --game-shirt-smoker: #363232;
     --game-pants: #1a1a1a;
 }
 
+/* -------------------------------------------------------------------------- */
+/* TERMINAL THEME                                                             */
+/* -------------------------------------------------------------------------- */
+
 :root[data-theme='terminal'] {
+    /* Layout Colors */
     --bg-page: #000000;
     --bg-surface: #0c0c0c;
     --bg-surface-highlight: #001a00;
 
+    /* Typography */
     --text-main: #4ade80;
     --text-muted: #166534;
 
+    /* Borders */
     --border-base: #22c55e;
 
+    /* Brand Identity */
     --brand-primary: #4ade80;
     --brand-primary-fg: #000000;
 
-    /* Synth Widget */
+    /* Component: Synth Widget */
     --key-white-bg: #000000;
     --key-white-active: #003300;
     --key-white-border: #4ade80;
@@ -131,36 +160,43 @@
     --key-black-active: #4ade80;
     --key-black-border: #22c55e;
 
-    /* Game Assets */
+    /* Component: Game Assets */
     --game-wood: #14532d;
     --game-metal: #000000;
     --game-shirt-smoker: #22c55e;
     --game-pants: #052e16;
 }
 
+/* -------------------------------------------------------------------------- */
+/* CATPPUCCIN THEME                                                           */
+/* -------------------------------------------------------------------------- */
+
 :root[data-theme='catppuccin'] {
+    /* Layout Colors */
     --bg-page: #1e1e2e;
     --bg-surface: #181825;
     --bg-surface-highlight: #313244;
 
+    /* Typography */
     --text-main: #cdd6f4;
     --text-muted: #a6adc8;
 
+    /* Borders */
     --border-base: #45475a;
 
+    /* Brand Identity */
     --brand-primary: #cba6f7;
     --brand-primary-fg: #1e1e2e;
 
-    /* Synth Widget */
+    /* Component: Synth Widget */
     --key-white-bg: #cdd6f4;
     --key-white-active: #b4befe;
     --key-white-border: #45475a;
-
     --key-black-bg: #11111b;
     --key-black-active: #1e1e2e;
     --key-black-border: #45475a;
 
-    /* Game Assets */
+    /* Component: Game Assets */
     --game-wood: #fab387;
     --game-metal: #11111b;
     --game-shirt-smoker: #89b4fa;

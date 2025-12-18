@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useSynth } from '../hooks/useSynth';
 
-// CSS variable classes
+/* -------------------------------------------------------------------------- */
+/* CONSTANTS & STYLES                                                         */
+/* -------------------------------------------------------------------------- */
+
 const themeClasses = {
     controlsContainer: 'flex items-center justify-between rounded-lg bg-surface-highlight border border-border-base p-2 transition-colors duration-300',
     button: 'rounded bg-surface px-2 py-1 text-xs font-bold shadow-sm text-text-main hover:bg-border-base border border-transparent hover:border-border-base transition-all cursor-pointer',
@@ -13,6 +16,10 @@ const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] 
 
 // 2-octave scale (24 semitones)
 const DOUBLE_SCALE = [...NOTES, ...NOTES];
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENT & LOGIC                                                          */
+/* -------------------------------------------------------------------------- */
 
 export default function Synth() {
     const [toneType, setToneType] = useState<OscillatorType>('sine');
@@ -32,7 +39,7 @@ export default function Synth() {
     return (
         <div className='flex h-full flex-col gap-4'>
 
-            {/* Controls */ }
+            {/* Controls UI */ }
             <div className={ themeClasses.controlsContainer }>
                 <div className='flex items-center gap-2'>
                     <button onClick={ () => setOctave(o => Math.max(1, o - 1)) } className={ themeClasses.button }>
@@ -58,11 +65,12 @@ export default function Synth() {
                 </div>
             </div>
 
-            {/* Keys Container Wrapper */ }
+            {/* Piano Roll UI */ }
             <div className='flex justify-center w-full'>
                 <div
                     className='relative flex select-none overflow-x-auto overflow-y-hidden rounded-md bg-zinc-400 ring-1 ring-border-base w-fit max-w-full in-[.dark]:bg-zinc-950'>
                     { DOUBLE_SCALE.map((note, i) => {
+                        // Skip rendering sharp notes directly; they are attached to the previous natural note
                         if (note.includes('#')) return null;
 
                         const nextNote = DOUBLE_SCALE[i + 1];
@@ -73,12 +81,11 @@ export default function Synth() {
                                 key={ `${ note }-${ i }` }
                                 className={ `relative flex w-14 h-48 shrink-0 flex-col border-t-3 ${ i == 0 ? 'border-l-3' : '' } ${ i == (NOTES.length * 2) - 1 ? 'border-r-3' : '' }` }
                             >
-                                {/* WHITE KEY */ }
+                                {/* White Key */ }
                                 <button
                                     onMouseDown={ () => handleNoteClick(i) }
                                     className={ `
                                         h-full w-full rounded-b-xs transition-colors duration-200 cursor-pointer border
-                                        
                                         bg-key-white-bg 
                                         border-key-white-border
                                         active:bg-key-white-active
@@ -86,7 +93,7 @@ export default function Synth() {
                                     ` }
                                 />
 
-                                {/* BLACK KEY */ }
+                                {/* Black Key Overlay */ }
                                 { hasSharp && (
                                     <button
                                         onMouseDown={ (e) => {
@@ -96,7 +103,6 @@ export default function Synth() {
                                         className={ `
                                             absolute left-full top-0 z-10 -translate-x-1/2 h-3/5 w-2/3 rounded-b-xs shadow-md
                                             transition-colors duration-200 cursor-pointer border
-                                            
                                             bg-key-black-bg 
                                             border-key-black-border
                                             active:bg-key-black-active

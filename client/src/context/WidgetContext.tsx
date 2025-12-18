@@ -1,5 +1,9 @@
 import { createContext, useContext } from 'react';
 
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
+
 export type WidgetType = 'synth' | 'game' | 'settings';
 
 interface WidgetContextType {
@@ -11,7 +15,16 @@ interface WidgetContextType {
     isWidgetOpen: (widget: WidgetType) => boolean;
 }
 
+/* -------------------------------------------------------------------------- */
+/* CONTEXT DEFINITION                                                         */
+/* -------------------------------------------------------------------------- */
+
 export const WidgetContext = createContext<WidgetContextType | undefined>(undefined);
+
+/* -------------------------------------------------------------------------- */
+/* CUSTOM HOOKS                                                               */
+
+/* -------------------------------------------------------------------------- */
 
 export function useWidgets() {
     const context = useContext(WidgetContext);

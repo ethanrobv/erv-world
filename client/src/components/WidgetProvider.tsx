@@ -2,7 +2,15 @@ import { useState, type ReactNode } from 'react';
 import { WidgetContext, type WidgetType } from '../context/WidgetContext';
 
 export function WidgetProvider({ children }: { children: ReactNode }) {
+    /* -------------------------------------------------------------------------- */
+    /* STATE                                                                      */
+    /* -------------------------------------------------------------------------- */
+
     const [activeWidgets, setActiveWidgets] = useState<WidgetType[]>([]);
+
+    /* -------------------------------------------------------------------------- */
+    /* ACTIONS                                                                    */
+    /* -------------------------------------------------------------------------- */
 
     const openWidget = (widget: WidgetType) => {
         setActiveWidgets((prev) => {
@@ -24,8 +32,6 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    const isWidgetOpen = (widget: WidgetType) => activeWidgets.includes(widget);
-
     const bringToFront = (widget: WidgetType) => {
         setActiveWidgets((prev) => {
             if (!prev.includes(widget)) return prev;
@@ -33,6 +39,16 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
             return [...others, widget];
         });
     };
+
+    /* -------------------------------------------------------------------------- */
+    /* HELPERS                                                                    */
+    /* -------------------------------------------------------------------------- */
+
+    const isWidgetOpen = (widget: WidgetType) => activeWidgets.includes(widget);
+
+    /* -------------------------------------------------------------------------- */
+    /* PROVIDER RENDER                                                            */
+    /* -------------------------------------------------------------------------- */
 
     return (
         <WidgetContext.Provider value={ {
