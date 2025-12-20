@@ -1,265 +1,336 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { type DataConnection } from 'peerjs';
 import { useNetwork } from '../context/NetworkContext';
+import { useWorkerInterval } from './useWorkerInterval';
+
+// Helper interface for safe typing of PeerJS errors
+interface PeerError extends Error {
+  type: string;
+}
 
 export const useGameP2P = (
-    onPeerJoined?: (id: string) => void,
-    onPeerLeft?: (id: string) => void,
-    getPeerList?: () => string[]
+  onPeerJoined?: (id: string) => void,
+  onPeerLeft?: (id: string) => void,
+  heirId?: string | null
 ) => {
-    /* -------------------------------------------------------------------------- */
-    /* STATE & REFS                                                               */
-    /* -------------------------------------------------------------------------- */
+  const { peer, peerId } = useNetwork();
 
-    const { peer, peerId } = useNetwork();
+  const [isHost, setIsHost] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [connections, setConnections] = useState<DataConnection[]>([]);
+  const [hostConn, setHostConn] = useState<DataConnection | null>(null);
+  const [p2pError, setP2pError] = useState<string | null>(null);
 
-    // Connection State
-    const [isHost, setIsHost] = useState(false);
-    const [roomCode, setRoomCode] = useState<string | null>(null);
-    const [connections, setConnections] = useState<DataConnection[]>([]);
-    const [hostConn, setHostConn] = useState<DataConnection | null>(null);
+  const roomCodeRef = useRef<string | null>(null);
+  const heirIdRef = useRef<string | null>(null);
 
-    // Refs for Event Listeners (avoids stale closures)
-    const roomCodeRef = useRef<string | null>(null);
-    const isHostRef = useRef(isHost);
-    const hostLastSeenRef = useRef<number>(Date.now());
+  // Watchdog Refs
+  const hostLastSeenRef = useRef<number>(Date.now());
+  const connectionStartRef = useRef<number>(0);
+  const targetPeerIdRef = useRef<string | null>(null);
 
-    // Sync State to Refs
-    useEffect(() => {
-        roomCodeRef.current = roomCode;
-    }, [roomCode]);
-    useEffect(() => {
-        isHostRef.current = isHost;
-    }, [isHost]);
+  // Locks
+  const isConnectingRef = useRef(false);
+  const [watchdogActive, setWatchdogActive] = useState(false);
 
-    /* -------------------------------------------------------------------------- */
-    /* API HELPERS & HEARTBEAT                                                    */
-    /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    roomCodeRef.current = roomCode;
+  }, [roomCode]);
+  useEffect(() => {
+    heirIdRef.current = heirId || null;
+  }, [heirId]);
 
-    // Keep the room alive on the server
-    useEffect(() => {
-        if (!isHost || !roomCode || !peerId) return;
-        const interval = setInterval(() => {
-            fetch('/api/game/heartbeat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomCode, peerId })
-            }).catch(() => {
-            });
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [isHost, roomCode, peerId]);
+  /* -------------------------------------------------------------------------- */
+  /* SERVER HEARTBEAT                                                           */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!isHost || !roomCode || !peerId) return;
+    const interval = setInterval(() => {
+      void fetch('/api/game/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode, peerId })
+      }).catch(() => {
+        // Heartbeat failure is silent
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isHost, roomCode, peerId]);
 
-    // Attempt to take over a room if the host dies
-    const claimThrone = useCallback(async (code: string) => {
-        if (!peerId) return false;
-        try {
-            const res = await fetch(`/api/game/room/${ code }`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ peerId })
-            });
-            return res.ok;
-        } catch (e) {
-            return false;
-        }
-    }, [peerId]);
+  /* -------------------------------------------------------------------------- */
+  /* API HELPERS                                                                */
+  /* -------------------------------------------------------------------------- */
+  const claimThrone = useCallback(async (code: string) => {
+    if (!peerId) return false;
+    try {
+      await fetch(`/api/game/room/${ code }`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peerId })
+      });
+      return true;
+    } catch {
+      console.warn('[API] Claim failed. Proceeding as Host locally.');
+      return false;
+    }
+  }, [peerId]);
 
-    /* -------------------------------------------------------------------------- */
-    /* HOST MIGRATION & WATCHDOG                                                  */
-    /* -------------------------------------------------------------------------- */
+  const getHostFromApi = useCallback(async (code: string) => {
+    try {
+      const res = await fetch(`/api/game/room/${ code }`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.hostId as string;
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }, []);
 
-    const setupGuestWatchdog = useCallback((conn: DataConnection) => {
-        hostLastSeenRef.current = Date.now();
-        const onData = () => {
-            hostLastSeenRef.current = Date.now();
-        };
-        conn.on('data', onData);
+  /* -------------------------------------------------------------------------- */
+  /* WORKER-POWERED WATCHDOG                                                    */
+  /* -------------------------------------------------------------------------- */
 
-        const interval = setInterval(() => {
-            if (conn.open) {
-                const timeSinceData = Date.now() - hostLastSeenRef.current;
-                if (timeSinceData > 5000) {
-                    console.warn('Host timed out (Watchdog). Forcing disconnect.');
-                    conn.close();
-                    clearInterval(interval);
-                }
-            } else {
-                clearInterval(interval);
-            }
-        }, 1000);
+  useWorkerInterval(() => {
+    if (!hostConn || !hostConn.open) return;
 
-        return () => {
-            conn.off('data', onData);
-            clearInterval(interval);
-        };
-    }, []);
+    const now = Date.now();
 
-    const handleHostMigration = useCallback(async (oldHostId: string) => {
-        if (!peer || !peerId || !getPeerList || !roomCodeRef.current) return;
+    // 1. IMMUTABLE GRACE PERIOD (5s)
+    if (now < connectionStartRef.current + 5000) return;
 
-        console.log('Host disconnected. Election starting...');
+    // 2. STRICT TIMEOUT (2s)
+    if (now - hostLastSeenRef.current > 2000) {
+      console.warn('[WATCHDOG] Host silent > 2s. Disconnecting.');
+      hostConn.close();
+      setWatchdogActive(false);
+    }
+  }, watchdogActive ? 250 : null);
 
-        // Filter out old host & Sort to ensure deterministic next host
-        const allPeers = getPeerList().filter(id => id !== oldHostId);
-        allPeers.sort();
+  const setupGuestWatchdog = useCallback((conn: DataConnection) => {
+    connectionStartRef.current = Date.now();
+    hostLastSeenRef.current = Date.now();
 
-        const nextHostId = allPeers[0];
+    const onData = () => {
+      hostLastSeenRef.current = Date.now();
+    };
+    conn.on('data', onData);
 
-        // Guard: No candidates
-        if (!nextHostId) {
-            console.error('Migration Aborted: No candidates found.');
-            return;
-        }
+    // Start the worker logic
+    setWatchdogActive(true);
 
-        if (nextHostId === peerId) {
-            console.log('Claiming room...');
-            const attemptClaim = async (attempts = 0) => {
-                const success = await claimThrone(roomCodeRef.current!);
-                if (success) {
-                    console.log('Room claimed.');
-                    setIsHost(true);
-                    setHostConn(null);
-                } else if (attempts < 5) {
-                    setTimeout(() => attemptClaim(attempts + 1), 1000);
-                }
-            };
-            await attemptClaim();
+    conn.on('close', () => {
+      setWatchdogActive(false);
+      conn.off('data', onData);
+    });
+  }, []);
+
+  /* -------------------------------------------------------------------------- */
+  /* CONNECTION LOGIC                                                           */
+  /* -------------------------------------------------------------------------- */
+  const connectToHost = useCallback((targetPeerId: string, targetRoomCode: string, retryCount = 0) => {
+    if (!peer || !peerId) return;
+    if (targetPeerId === peerId) return;
+
+    if (hostConn && hostConn.peer === targetPeerId && hostConn.open) return;
+    if (isConnectingRef.current && retryCount === 0) return;
+
+    targetPeerIdRef.current = targetPeerId;
+    isConnectingRef.current = true;
+    console.log(`[P2P] Connecting to Host: ${ targetPeerId } (Attempt ${ retryCount + 1 })`);
+
+    const conn = peer.connect(targetPeerId, { reliable: true });
+
+    const onOpen = () => {
+      console.log('[P2P] Connected.');
+      isConnectingRef.current = false;
+      setHostConn(conn);
+      setRoomCode(targetRoomCode);
+      setIsHost(false);
+      setupGuestWatchdog(conn);
+    };
+
+    const handleHostLost = () => {
+      console.log('[P2P] Host connection lost/failed.');
+      setWatchdogActive(false);
+      setHostConn(null);
+      isConnectingRef.current = false;
+      if (onPeerLeft) onPeerLeft(targetPeerId);
+
+      const currentHeir = heirIdRef.current;
+
+      if (currentHeir) {
+        if (currentHeir === peerId) {
+          console.log('[MIGRATION] I am Heir. Promoting.');
+          setIsHost(true);
+          void claimThrone(targetRoomCode);
         } else {
-            console.log(`Connecting to new Host: ${ nextHostId }`);
-            // Random delay to prevent hammering the new host instantly
-            setTimeout(() => {
-                if (isHostRef.current) return;
-                const newConn = peer.connect(nextHostId, { reliable: true });
-                newConn.on('open', () => setHostConn(newConn));
-                newConn.on('close', () => {
-                    setHostConn(null);
-                    handleHostMigration(nextHostId);
-                });
-                setupGuestWatchdog(newConn);
-            }, 1000 + Math.random() * 1000);
+          console.log(`[MIGRATION] Connecting to Heir: ${ currentHeir }`);
+          setTimeout(() => {
+            connectToHost(currentHeir, targetRoomCode);
+          }, 100 + Math.random() * 200);
         }
-    }, [peer, peerId, getPeerList, claimThrone, setupGuestWatchdog]);
+        return;
+      }
 
-    /* -------------------------------------------------------------------------- */
-    /* EVENT LISTENERS (HOST SIDE)                                                */
-    /* -------------------------------------------------------------------------- */
-
-    useEffect(() => {
-        if (!peer || !isHost) return;
-        const handleConnection = (conn: DataConnection) => {
-            conn.on('open', () => {
-                setConnections(prev => {
-                    const others = prev.filter(c => c.peer !== conn.peer);
-                    return [...others, conn];
-                });
-                if (onPeerJoined) onPeerJoined(conn.peer);
-            });
-            conn.on('close', () => {
-                setConnections(prev => prev.filter(c => c.peer !== conn.peer));
-                if (onPeerLeft) onPeerLeft(conn.peer);
-            });
-            conn.on('error', () => {
-                setConnections(prev => prev.filter(c => c.peer !== conn.peer));
-                if (onPeerLeft) onPeerLeft(conn.peer);
-            });
-        };
-        peer.on('connection', handleConnection);
-        return () => {
-            peer.off('connection', handleConnection);
-        };
-    }, [peer, isHost, onPeerJoined, onPeerLeft]);
-
-    /* -------------------------------------------------------------------------- */
-    /* PUBLIC ACTIONS (JOIN/HOST)                                                 */
-    /* -------------------------------------------------------------------------- */
-
-    const startHosting = useCallback(async () => {
-        if (!peerId) return;
-        try {
-            const res = await fetch('/api/game/host', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ peerId })
-            });
-            const data = await res.json();
-            setRoomCode(data.roomCode);
-            setIsHost(true);
-        } catch (e) {
-            console.error(e);
+      void getHostFromApi(targetRoomCode).then((serverHostId) => {
+        if (serverHostId && serverHostId !== targetPeerId) {
+          console.log(`[MIGRATION] Server points to: ${ serverHostId }`);
+          connectToHost(serverHostId, targetRoomCode);
+        } else {
+          console.warn('[MIGRATION] Room lost. Taking over.');
+          setIsHost(true);
+          void claimThrone(targetRoomCode);
         }
-    }, [peerId]);
+      });
+    };
 
-    const joinRoom = useCallback(async (code: string) => {
-        return new Promise<void>(async (resolve, reject) => {
-            if (!peer) return reject('Peer not initialized');
+    conn.on('close', handleHostLost);
+    conn.on('error', (err) => {
+      console.error('[P2P] Conn Error:', err);
+      conn.close();
+    });
+    conn.on('open', onOpen);
 
-            try {
-                const res = await fetch('/api/game/room/' + code.toUpperCase());
-                if (!res.ok) {
-                    return reject('Failed to communicate with server');
-                }
-                const { hostId } = await res.json();
+    setTimeout(() => {
+      if (!conn.open && !isHost && isConnectingRef.current && targetPeerIdRef.current === targetPeerId) {
+        console.warn('[P2P] Timeout. Aborting.');
+        conn.close();
+        handleHostLost();
+      }
+    }, 5000);
 
-                console.log('Connecting to host:', hostId);
-                const conn = peer.connect(hostId, { reliable: true });
+  }, [peer, peerId, setupGuestWatchdog, onPeerLeft, claimThrone, isHost, hostConn, getHostFromApi]);
 
-                const cleanup = () => {
-                    conn.off('open', onOpen);
-                    conn.off('error', onError);
-                    conn.off('close', onClose);
-                    clearTimeout(timer);
-                };
+  /* -------------------------------------------------------------------------- */
+  /* PEER LIFECYCLE                                                             */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!peer) return;
 
-                const onOpen = () => {
-                    cleanup();
-                    setHostConn(conn);
-                    setRoomCode(code.toUpperCase());
-                    setIsHost(false);
+    const handleDisconnected = () => peer.reconnect();
 
-                    setupGuestWatchdog(conn);
-                    conn.on('close', () => {
-                        console.log('Host connection lost.');
-                        setHostConn(null);
-                        // Tell Game to remove old host model
-                        if (onPeerLeft) onPeerLeft(hostId);
-                        handleHostMigration(hostId);
-                    });
+    const handleError = (err: unknown) => {
+      console.error('[Peer] Error:', err);
 
-                    resolve();
-                };
+      // Safe casting to check for specific PeerJS error properties
+      const peerError = err as PeerError;
 
-                const handleFailure = async (reason: string) => {
-                    cleanup();
-                    console.log(`Connection failed (${ reason }). Attempting recovery...`);
-                    const claimed = await claimThrone(code.toUpperCase());
-                    if (claimed) {
-                        console.log('Recovery Successful: You are now the Host.');
-                        setRoomCode(code.toUpperCase());
-                        setIsHost(true);
-                        resolve();
-                    } else {
-                        reject(reason);
-                    }
-                };
+      if (peerError.type === 'peer-unavailable' || peerError.type === 'socket-closed' || peerError.type === 'network') {
+        if (targetPeerIdRef.current && isConnectingRef.current) {
+          console.warn('[P2P] Target unavailable. Triggering migration.');
+          isConnectingRef.current = false;
+        }
+      }
 
-                const onError = (err: any) => handleFailure(err || 'Connection failed');
-                const onClose = () => handleFailure('Closed during handshake');
+      if (peerError.type === 'unavailable-id' || peerError.type === 'invalid-id') {
+        isConnectingRef.current = false;
+        setP2pError(`Network Error: ${ peerError.type }`);
+      }
+    };
 
-                conn.on('open', onOpen);
-                conn.on('error', onError);
-                conn.on('close', onClose);
+    peer.on('disconnected', handleDisconnected);
+    peer.on('error', handleError);
 
-                const timer = setTimeout(() => {
-                    conn.close();
-                    handleFailure('Timeout');
-                }, 4000);
+    return () => {
+      peer.off('disconnected', handleDisconnected);
+      peer.off('error', handleError);
+    };
+  }, [peer]);
 
-            } catch (e) {
-                reject(e);
-            }
-        });
-    }, [peer, setupGuestWatchdog, handleHostMigration, claimThrone, onPeerLeft]);
+  /* -------------------------------------------------------------------------- */
+  /* GHOST RECOVERY                                                             */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!isHost || !heirId || heirId === peerId) return;
+    if (connections.length === 0) {
+      console.log('[P2P] Ghost Host detected. Abdicating.');
+      setIsHost(false);
+      setConnections([]);
+      setTimeout(() => {
+        if (roomCodeRef.current) connectToHost(heirId, roomCodeRef.current);
+      }, 500);
+    }
+  }, [isHost, heirId, peerId, connections.length, connectToHost]);
 
-    return { peerId, isHost, roomCode, connections, hostConn, startHosting, joinRoom };
+  /* -------------------------------------------------------------------------- */
+  /* HOST LISTENERS                                                             */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!peer || !isHost) return;
+    const handleConnection = (conn: DataConnection) => {
+      conn.on('open', () => {
+        setConnections(prev => prev.some(c => c.peer === conn.peer) ? prev : [...prev, conn]);
+        if (onPeerJoined) onPeerJoined(conn.peer);
+      });
+      conn.on('close', () => {
+        setConnections(prev => prev.filter(c => c.peer !== conn.peer));
+        if (onPeerLeft) onPeerLeft(conn.peer);
+      });
+      conn.on('error', () => {
+        setConnections(prev => prev.filter(c => c.peer !== conn.peer));
+        if (onPeerLeft) onPeerLeft(conn.peer);
+      });
+    };
+    peer.on('connection', handleConnection);
+    return () => {
+      peer.off('connection', handleConnection);
+    };
+  }, [peer, isHost, onPeerJoined, onPeerLeft]);
+
+  /* -------------------------------------------------------------------------- */
+  /* PUBLIC ACTIONS                                                             */
+  /* -------------------------------------------------------------------------- */
+  const startHosting = useCallback(async () => {
+    if (!peerId) return;
+    setP2pError(null);
+
+    try {
+      const res = await fetch('/api/game/host', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peerId })
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => res.statusText);
+        throw new Error(`Server rejected request (${ res.status }): ${ errorBody }`);
+      }
+
+      const data = await res.json();
+      setRoomCode(data.roomCode);
+      setIsHost(true);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[Host] Failed to start:', msg);
+      setP2pError(msg || 'Failed to start hosting');
+    }
+  }, [peerId]);
+
+  const joinRoom = useCallback(async (code: string) => {
+    if (!peer) throw new Error('Peer not ready');
+    setIsHost(false);
+    setHostConn(null);
+    setConnections([]);
+    setWatchdogActive(false);
+    isConnectingRef.current = false;
+    setP2pError(null);
+
+    try {
+      const res = await fetch('/api/game/room/' + code.toUpperCase());
+      if (!res.ok) {
+        setP2pError('Room not found');
+        return;
+      }
+      const { hostId } = await res.json();
+      connectToHost(hostId, code.toUpperCase());
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[Join] Failed:', msg);
+      setP2pError(msg || 'Failed to join');
+    }
+  }, [peer, connectToHost]);
+
+  return { peerId, isHost, roomCode, connections, hostConn, startHosting, joinRoom, p2pError };
 };

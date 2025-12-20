@@ -57,6 +57,11 @@
     --game-metal: #1a1a1a;
     --game-shirt-smoker: #34495e;
     --game-pants: #222222;
+
+    /* Component: Player Model */
+    --player-torso: #2563eb; /* Bright Blue */
+    --player-legs: #1e293b; /* Slate 800 */
+    --player-head: #fbbf24; /* Amber 400 */
 }
 
 /* -------------------------------------------------------------------------- */
@@ -93,6 +98,11 @@
     --game-metal: #000000;
     --game-shirt-smoker: #4a6fa5;
     --game-pants: #111111;
+
+    /* Component: Player Model */
+    --player-torso: #60a5fa; /* Blue 400 */
+    --player-legs: #0f172a; /* Slate 900 */
+    --player-head: #facc15; /* Yellow 400 */
 }
 
 /* -------------------------------------------------------------------------- */
@@ -129,6 +139,11 @@
     --game-metal: #ffffff;
     --game-shirt-smoker: #363232;
     --game-pants: #1a1a1a;
+
+    /* Component: Player Model */
+    --player-torso: #ff00ff; /* Magenta */
+    --player-legs: #ffffff; /* White */
+    --player-head: #ffff00; /* Yellow */
 }
 
 /* -------------------------------------------------------------------------- */
@@ -165,6 +180,11 @@
     --game-metal: #000000;
     --game-shirt-smoker: #22c55e;
     --game-pants: #052e16;
+
+    /* Component: Player Model */
+    --player-torso: #22c55e; /* Green 500 */
+    --player-legs: #14532d; /* Green 900 */
+    --player-head: #86efac; /* Green 300 */
 }
 
 /* -------------------------------------------------------------------------- */
@@ -201,4 +221,9 @@
     --game-metal: #11111b;
     --game-shirt-smoker: #89b4fa;
     --game-pants: #181825;
+
+    /* Component: Player Model */
+    --player-torso: #f38ba8; /* Red/Pink */
+    --player-legs: #11111b; /* Crust */
+    --player-head: #f9e2af; /* Yellow */
 }

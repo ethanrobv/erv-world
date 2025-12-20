@@ -1,8 +1,9 @@
 import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Text, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import type { Card } from './GameConfig';
 
 /* -------------------------------------------------------------------------- */
 /* BASE COMPONENTS                                                            */
@@ -43,9 +44,209 @@ export const SoftBlock = ({
 );
 
 /* -------------------------------------------------------------------------- */
-/* ENVIRONMENT & ARCHITECTURE                                                 */
+/* ACTIVITY ASSETS                                                            */
 /* -------------------------------------------------------------------------- */
 
+export const PlayingCardVisual = ({ card, position, rotation, isVisible }: {
+    card: Card,
+    position: [number, number, number],
+    rotation?: [number, number, number],
+    isVisible: boolean
+}) => {
+    const cardBackColor = useThemeColor('--brand-primary');
+    const w = 0.7;
+    const h = 1.0;
+    const d = 0.02;
+
+    const isRed = ['♥', '♦'].includes(card.suit);
+    const color = isRed ? '#d32f2f' : '#000000';
+
+    return (
+        <group position={ position } rotation={ rotation }>
+            {/* Outline/Border for contrast against background */ }
+            <mesh position={ [0, 0, 0] }>
+                <boxGeometry args={ [w + 0.02, h + 0.02, d - 0.005] }/>
+                <meshBasicMaterial color='#000000'/>
+            </mesh>
+
+            {/* Main Card Body */ }
+            <SoftBlock args={ [w, h, d] } color='#ffffff'/>
+
+            {/* Back Pattern */ }
+            <mesh position={ [0, 0, -d / 2 - 0.001] } rotation={ [0, Math.PI, 0] }>
+                <planeGeometry args={ [w - 0.05, h - 0.05] }/>
+                <meshStandardMaterial color={ cardBackColor }/>
+            </mesh>
+
+            { isVisible ? (
+                <group position={ [0, 0, d / 2 + 0.001] }>
+                    <Text position={ [-w / 2 + 0.15, h / 2 - 0.15, 0] } fontSize={ 0.25 } color={ color }
+                          anchorX='center' anchorY='middle'
+                          font='https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff'>
+                        { card.rank }
+                    </Text>
+                    <Text position={ [0, 0, 0] } fontSize={ 0.45 } color={ color } anchorX='center' anchorY='middle'
+                          font='https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff'>
+                        { card.suit }
+                    </Text>
+                    <Text position={ [w / 2 - 0.15, -h / 2 + 0.15, 0] } fontSize={ 0.25 } color={ color }
+                          rotation={ [0, 0, Math.PI] } anchorX='center' anchorY='middle'
+                          font='https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff'>
+                        { card.rank }
+                    </Text>
+                </group>
+            ) : (
+                <mesh position={ [0, 0, d / 2 + 0.001] }>
+                    <planeGeometry args={ [w - 0.05, h - 0.05] }/>
+                    <meshStandardMaterial color={ cardBackColor }/>
+                </mesh>
+            ) }
+        </group>
+    );
+};
+
+export const HandVisuals = ({ hand, isLocal }: { hand: Card[], isLocal: boolean }) => {
+    const groupRef = useRef<THREE.Group>(null);
+    const { camera } = useThree();
+
+    useFrame(() => {
+        if (groupRef.current) {
+            groupRef.current.quaternion.copy(camera.quaternion);
+        }
+    });
+
+    return (
+        <group ref={ groupRef } position={ [0, 3.4, 0] }>
+            { hand.map((card, i) => {
+                const offset = (i - (hand.length - 1) / 2) * 0.85;
+                const showFace = isLocal || !card.isHidden;
+
+                return (
+                    <PlayingCardVisual
+                        key={ `${ card.rank }-${ card.suit }-${ i }` }
+                        card={ card }
+                        position={ [offset, 0, 0] }
+                        rotation={ [0, 0, 0] }
+                        isVisible={ showFace }
+                    />
+                );
+            }) }
+        </group>
+    );
+};
+
+export const BlackjackTable = ({ position, rotation = [0, 0, 0] }: {
+    position: [number, number, number],
+    rotation?: [number, number, number]
+}) => {
+    const feltColor = useThemeColor('--brand-primary');
+    const woodColor = useThemeColor('--game-wood');
+    const legColor = useThemeColor('--game-metal');
+    const cardColor = useThemeColor('--brand-primary');
+
+    return (
+        <group position={ position } rotation={ rotation }>
+            {/* Table Top*/ }
+            <SoftBlock args={ [6.0, 0.1, 3.0] } color={ feltColor } position={ [0, 1.2, 0] }/>
+            <SoftBlock args={ [6.2, 0.15, 3.2] } color={ woodColor } position={ [0, 1.1, 0] }/>
+
+            {/* Legs */ }
+            <SoftBlock args={ [0.4, 1.1, 0.4] } color={ legColor } position={ [-2.5, 0.55, 1.2] }/>
+            <SoftBlock args={ [0.4, 1.1, 0.4] } color={ legColor } position={ [2.5, 0.55, 1.2] }/>
+            <SoftBlock args={ [0.4, 1.1, 0.4] } color={ legColor } position={ [-2.5, 0.55, -1.2] }/>
+            <SoftBlock args={ [0.4, 1.1, 0.4] } color={ legColor } position={ [2.5, 0.55, -1.2] }/>
+
+            {/* Dealer Chip Tray */ }
+            <SoftBlock args={ [1.5, 0.05, 0.5] } color='#111' position={ [0, 1.25, -1.0] }/>
+            <SoftBlock args={ [0.3, 0.15, 0.4] } color='#b00' position={ [2.0, 1.25, -0.8] }/>
+
+            {/* Spread-out Cards */ }
+            <group position={ [0, 1.26, 0] }>
+                {/* Center Spread */ }
+                { [0, 1, 2].map(i => (
+                    <mesh key={ i } rotation={ [-Math.PI / 2, 0, (i - 1) * 0.2] } position={ [(i - 1) * 0.4, 0, 0] }>
+                        <planeGeometry args={ [0.35, 0.5] }/>
+                        <meshStandardMaterial color='#fff'/>
+                        <mesh position={ [0, 0, -0.001] }>
+                            <planeGeometry args={ [0.3, 0.45] }/>
+                            <meshStandardMaterial color={ cardColor }/>
+                        </mesh>
+                    </mesh>
+                )) }
+                {/* Deck Stack Left */ }
+                <SoftBlock args={ [0.35, 0.15, 0.5] } color={ cardColor } position={ [-1.5, 0.075, -0.5] }
+                           rotation={ [0, 0.2, 0] }/>
+                {/* Deck Stack Right */ }
+                <SoftBlock args={ [0.35, 0.1, 0.5] } color='#fff' position={ [1.5, 0.05, -0.5] }
+                           rotation={ [0, -0.1, 0] }/>
+            </group>
+        </group>
+    );
+};
+
+export const DealerNPC = ({ position, rotation = [0, 0, 0], hand }: {
+    position: [number, number, number],
+    rotation?: [number, number, number],
+    hand: Card[]
+}) => {
+    const vestColor = '#111';
+    const skinColor = useThemeColor('--border-base');
+    const shirtColor = '#fff';
+
+    const handGroupRef = useRef<THREE.Group>(null);
+    const { camera } = useThree();
+    useFrame(() => {
+        if (handGroupRef.current) {
+            handGroupRef.current.quaternion.copy(camera.quaternion);
+        }
+    });
+
+    return (
+        <group position={ position } rotation={ rotation }>
+            {/* NPC Body */ }
+            <group>
+                {/* Head */ }
+                <SoftBlock args={ [0.5, 0.5, 0.5] } color={ skinColor } position={ [0, 1.45, 0] }/>
+
+                {/* [!code change] Dealer Visor */ }
+                <group position={ [0, 1.6, 0.26] }>
+                    <mesh rotation={ [0.2, 0, 0] }>
+                        <boxGeometry args={ [0.52, 0.05, 0.25] }/>
+                        <meshStandardMaterial color='#00aa00' transparent opacity={ 0.6 }/>
+                    </mesh>
+                </group>
+
+                {/* Body */ }
+                <SoftBlock args={ [0.6, 0.7, 0.4] } color={ vestColor } position={ [0, 0.85, 0] }/>
+
+                {/* [!code change] Bowtie */ }
+                <SoftBlock args={ [0.2, 0.1, 0.05] } color='#d32f2f' position={ [0, 1.15, 0.21] }/>
+
+                {/* Arms */ }
+                <group position={ [0.4, 1.15, 0] } rotation={ [0.5, 0, -0.2] }>
+                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor }/>
+                </group>
+                <group position={ [-0.4, 1.15, 0] } rotation={ [0.5, 0, 0.2] }>
+                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor }/>
+                </group>
+            </group>
+
+            <group ref={ handGroupRef } position={ [0, 3.4, 0] }>
+                { hand.map((c, i) => {
+                    const offset = (i - (hand.length - 1) / 2) * 0.85;
+                    return (
+                        <PlayingCardVisual
+                            key={ i }
+                            card={ c }
+                            position={ [offset, 0, 0] }
+                            isVisible={ !c.isHidden }
+                        />
+                    );
+                }) }
+            </group>
+        </group>
+    );
+};
 export const Floor = ({ colorOverride }: { colorOverride?: string }) => {
     const defaultColor = useThemeColor('--bg-surface');
     return (
@@ -106,10 +307,6 @@ export const PortalDoor = ({ position, rotation = [0, 0, 0], label, isOpen }: {
     );
 };
 
-/* -------------------------------------------------------------------------- */
-/* PROPS & FURNITURE                                                          */
-/* -------------------------------------------------------------------------- */
-
 export const SimpleBottle = ({ position, width, height, color }: any) => (
     <mesh position={ position } castShadow>
         <boxGeometry args={ [width, height, width] }/>
@@ -159,10 +356,6 @@ export const Bench = ({ position, rotation = [0, 0, 0] }: {
         </group>
     );
 };
-
-/* -------------------------------------------------------------------------- */
-/* CHARACTERS                                                                 */
-/* -------------------------------------------------------------------------- */
 
 export const Bartender = ({ position, rotation = [0, 0, 0] }: {
     position: [number, number, number],
@@ -259,20 +452,16 @@ export const AlleySmoker = ({ position, rotation = [0, 0, 0] }: {
                 </group>
 
                 {/* Legs */ }
-                <group position={ [-0.15, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
+                <group position={ [-0.18, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
                     <SoftBlock args={ [0.2, 0.8, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
                 </group>
-                <group position={ [0.15, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
+                <group position={ [0.18, 0.45, 0] } rotation={ [-Math.PI / 2, 0, 0] }>
                     <SoftBlock args={ [0.2, 0.8, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }/>
                 </group>
             </group>
         </group>
     );
 };
-
-/* -------------------------------------------------------------------------- */
-/* EFFECTS & PARTICLES                                                        */
-/* -------------------------------------------------------------------------- */
 
 const SmokeParticles = () => {
     const groupRef = useRef<THREE.Group>(null);

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import type { Card } from './GameConfig.ts';
 import {
     Floor,
     SoftBlock,
@@ -9,18 +10,64 @@ import {
     AlleySmoker,
     Bench,
     CardboardBox,
-    Dumpster
+    Dumpster,
+    BlackjackTable,
+    DealerNPC
 } from './GameAssets';
+
+/* -------------------------------------------------------------------------- */
+/* SHARED COMPONENTS                                                          */
+/* -------------------------------------------------------------------------- */
+
+const BarStool = ({ position, rotation = [0, 0, 0] }: {
+    position: [number, number, number],
+    rotation?: [number, number, number]
+}) => {
+    const woodColor = useThemeColor('--border-base');
+    const legColor = useThemeColor('--text-muted');
+
+    return (
+        <group position={ position } rotation={ rotation }>
+            {/* [!code change] Restored Taller Height (0.8) */ }
+            <SoftBlock args={ [0.45, 0.1, 0.45] } color={ woodColor } position={ [0, 0.8, 0] }/>
+            <SoftBlock args={ [0.08, 0.8, 0.08] } color={ legColor } position={ [0, 0.4, 0] }/>
+            <SoftBlock args={ [0.4, 0.05, 0.4] } color={ legColor } position={ [0, 0.025, 0] }/>
+        </group>
+    );
+};
+
+const BlackjackChair = ({ position, rotation = [0, 0, 0] }: {
+    position: [number, number, number],
+    rotation?: [number, number, number]
+}) => {
+    const woodColor = useThemeColor('--border-base');
+    const cushionColor = useThemeColor('--text-muted');
+    const legColor = useThemeColor('--game-metal');
+
+    return (
+        <group position={ position } rotation={ rotation }>
+            <SoftBlock args={ [0.6, 0.1, 0.6] } color={ cushionColor } position={ [0, 0.5, 0] }/>
+            <SoftBlock args={ [0.6, 0.6, 0.1] } color={ woodColor } position={ [0, 0.8, -0.25] }/>
+            <SoftBlock args={ [0.08, 0.5, 0.08] } color={ legColor } position={ [-0.25, 0.25, -0.25] }/>
+            <SoftBlock args={ [0.08, 0.5, 0.08] } color={ legColor } position={ [0.25, 0.25, -0.25] }/>
+            <SoftBlock args={ [0.08, 0.5, 0.08] } color={ legColor } position={ [-0.25, 0.25, 0.25] }/>
+            <SoftBlock args={ [0.08, 0.5, 0.08] } color={ legColor } position={ [0.25, 0.25, 0.25] }/>
+        </group>
+    );
+};
 
 /* -------------------------------------------------------------------------- */
 /* BAR LEVEL SCENE                                                            */
 /* -------------------------------------------------------------------------- */
 
-export const BarLevel = ({ isDoorOpen }: { isDoorOpen: boolean, playerRef?: any }) => {
+export const BarLevel = ({ isDoorOpen, dealerHand = [] }: {
+    isDoorOpen: boolean,
+    playerRef?: any,
+    dealerHand?: Card[]
+}) => {
     // Theme & Config
     const surfaceColor = useThemeColor('--bg-surface-highlight');
     const woodColor = useThemeColor('--border-base');
-    const legColor = useThemeColor('--text-muted');
     const wallColor = useThemeColor('--bg-page');
     const shelfColor = useThemeColor('--bg-surface-highlight');
     const palette = [
@@ -74,24 +121,33 @@ export const BarLevel = ({ isDoorOpen }: { isDoorOpen: boolean, playerRef?: any 
                                position={ [0, barHeight + 0.075, 0] }/>
                 </group>
 
-                {/* Stools */ }
+                {/* Bar Stools */ }
                 { [-2, 0, 2].map((xOffset, i) => (
-                    <group key={ i } position={ [xOffset, 0, -0.6] }>
-                        <SoftBlock args={ [0.5, 0.1, 0.5] } color={ woodColor } position={ [0, 0.9, 0] }/>
-                        <SoftBlock args={ [0.1, 0.9, 0.1] } color={ legColor } position={ [0, 0.45, 0] }/>
-                        <SoftBlock args={ [0.3, 0.05, 0.3] } color={ legColor } position={ [0, 0.1, 0] }/>
-                    </group>
+                    <BarStool key={ i } position={ [xOffset, 0, -0.6] }/>
                 )) }
             </group>
 
             {/* Characters */ }
             <Bartender position={ [-4, 0, -2.8] } rotation={ [0, 0, 0] }/>
 
+            {/* Blackjack Area */ }
+            <group position={ [3, 0, 2.5] }>
+                <BlackjackTable position={ [0, 0, 0] } rotation={ [0, 0, 0] }/>
+                <DealerNPC position={ [0, 0, -2.0] } rotation={ [0, 0, 0] } hand={ dealerHand }/>
+
+                <BlackjackChair position={ [-3.8, 0, 0] } rotation={ [0, Math.PI / 2, 0] }/>
+                <BlackjackChair position={ [-2.0, 0, 1.8] } rotation={ [0, Math.PI, 0] }/>
+                <BlackjackChair position={ [0.0, 0, 1.8] } rotation={ [0, Math.PI, 0] }/>
+                <BlackjackChair position={ [2.0, 0, 1.8] } rotation={ [0, Math.PI, 0] }/>
+                <BlackjackChair position={ [3.8, 0, 0] } rotation={ [0, -Math.PI / 2, 0] }/>
+            </group>
+
             {/* Environment: Walls & Shelves */ }
             <group position={ [0, 0, -4] }>
                 <SoftBlock args={ [80, 8, 1] } color={ wallColor } position={ [0, 4, -0.6] }/>
 
                 <group position={ [-4, 0, 0] }>
+                    {/* Bottom Shelf at 2.2 */ }
                     <SoftBlock args={ [5.5, 0.1, 0.4] } color={ shelfColor } position={ [0, 2.2, 0] }/>
                     { bottomRow.map((b) => (
                         <SimpleBottle
@@ -103,6 +159,7 @@ export const BarLevel = ({ isDoorOpen }: { isDoorOpen: boolean, playerRef?: any 
                         />
                     )) }
 
+                    {/* Top Shelf at 3.2 */ }
                     <SoftBlock args={ [5.5, 0.1, 0.4] } color={ shelfColor } position={ [0, 3.2, 0] }/>
                     { topRow.map((b) => (
                         <SimpleBottle
@@ -121,10 +178,6 @@ export const BarLevel = ({ isDoorOpen }: { isDoorOpen: boolean, playerRef?: any 
         </group>
     );
 };
-
-/* -------------------------------------------------------------------------- */
-/* ALLEY LEVEL SCENE                                                          */
-/* -------------------------------------------------------------------------- */
 
 export const AlleyLevel = ({ isDoorOpen }: { isDoorOpen: boolean }) => {
     const wallColor = useThemeColor('--bg-surface');
