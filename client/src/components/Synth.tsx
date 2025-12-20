@@ -2,32 +2,32 @@ import { useState } from 'react';
 import { useSynth } from '../hooks/useSynth';
 
 /* -------------------------------------------------------------------------- */
-/* CONSTANTS & STYLES                                                         */
+/* TYPES & CONSTANTS                                                          */
 /* -------------------------------------------------------------------------- */
-
-const themeClasses = {
-    controlsContainer: 'flex items-center justify-between rounded-lg bg-surface-highlight border border-border-base p-2 transition-colors duration-300',
-    button: 'rounded bg-surface px-2 py-1 text-xs font-bold shadow-sm text-text-main hover:bg-border-base border border-transparent hover:border-border-base transition-all cursor-pointer',
-    textMain: 'min-w-[3rem] text-center font-mono text-sm font-bold text-text-main',
-    textMuted: 'text-xs text-text-muted'
-};
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 
 // 2-octave scale (24 semitones)
 const DOUBLE_SCALE = [...NOTES, ...NOTES];
 
+const THEME_CLASSES = {
+    controlsContainer: 'flex items-center justify-between rounded-lg bg-surface-highlight border border-border-base p-2 transition-colors duration-300',
+    button: 'rounded bg-surface px-2 py-1 text-xs font-bold shadow-sm text-text-main hover:bg-border-base border border-transparent hover:border-border-base transition-all cursor-pointer',
+    textMain: 'min-w-[3rem] text-center font-mono text-sm font-bold text-text-main',
+    textMuted: 'text-xs text-text-muted'
+};
+
 /* -------------------------------------------------------------------------- */
-/* COMPONENT & LOGIC                                                          */
+/* COMPONENT                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export default function Synth() {
     const [toneType, setToneType] = useState<OscillatorType>('sine');
-    const { playTone } = useSynth();
     const [octave, setOctave] = useState(3);
+    const { playTone } = useSynth();
 
     const getFreq = (index: number) => {
-        const baseNote = (octave + 1) * 12;
+        const baseNote = (octave + 1) * 12; // MIDI note calculation
         const midiNote = baseNote + index;
         return 440 * Math.pow(2, (midiNote - 69) / 12);
     };
@@ -36,30 +36,38 @@ export default function Synth() {
         playTone(getFreq(index), toneType);
     };
 
+    const cycleWaveform = () => {
+        const types: OscillatorType[] = ['sine', 'square', 'triangle', 'sawtooth'];
+        const nextIndex = (types.indexOf(toneType) + 1) % types.length;
+        setToneType(types[nextIndex]);
+    };
+
     return (
         <div className='flex h-full flex-col gap-4'>
 
             {/* Controls UI */ }
-            <div className={ themeClasses.controlsContainer }>
+            <div className={ THEME_CLASSES.controlsContainer }>
                 <div className='flex items-center gap-2'>
-                    <button onClick={ () => setOctave(o => Math.max(1, o - 1)) } className={ themeClasses.button }>
+                    <button
+                        onClick={ () => setOctave(o => Math.max(1, o - 1)) }
+                        className={ THEME_CLASSES.button }
+                    >
                         - Oct
                     </button>
 
-                    <span className={ themeClasses.textMain }>
+                    <span className={ THEME_CLASSES.textMain }>
                         C{ octave }
                     </span>
 
-                    <button onClick={ () => setOctave(o => Math.min(6, o + 1)) } className={ themeClasses.button }>
+                    <button
+                        onClick={ () => setOctave(o => Math.min(6, o + 1)) }
+                        className={ THEME_CLASSES.button }
+                    >
                         + Oct
                     </button>
                 </div>
                 <div>
-                    <button onClick={ () => {
-                        const types: OscillatorType[] = ['sine', 'square', 'triangle', 'sawtooth'];
-                        const nextIndex = (types.indexOf(toneType) + 1) % types.length;
-                        setToneType(types[nextIndex]);
-                    } } className={ themeClasses.button }>
+                    <button onClick={ cycleWaveform } className={ THEME_CLASSES.button }>
                         { toneType }
                     </button>
                 </div>
@@ -68,29 +76,27 @@ export default function Synth() {
             {/* Piano Roll UI */ }
             <div className='flex justify-center w-full'>
                 <div
-                    className='relative flex select-none overflow-x-auto overflow-y-hidden rounded-md bg-zinc-400 ring-1 ring-border-base w-fit max-w-full in-[.dark]:bg-zinc-950'>
+                    className='relative flex select-none overflow-x-auto overflow-y-hidden rounded-md bg-zinc-400 ring-1 ring-border-base w-fit max-w-full dark:bg-zinc-950'>
                     { DOUBLE_SCALE.map((note, i) => {
-                        // Skip rendering sharp notes directly; they are attached to the previous natural note
+                        // Skip rendering sharp notes directly; they are physically attached to the previous natural note
                         if (note.includes('#')) return null;
 
+                        // Check if the NEXT note is a sharp relative to this one
                         const nextNote = DOUBLE_SCALE[i + 1];
                         const hasSharp = nextNote && nextNote.includes('#');
+
+                        const isFirst = i === 0;
+                        const isLast = i === (NOTES.length * 2) - 1; // Last natural note roughly
 
                         return (
                             <div
                                 key={ `${ note }-${ i }` }
-                                className={ `relative flex w-14 h-48 shrink-0 flex-col border-t-3 ${ i == 0 ? 'border-l-3' : '' } ${ i == (NOTES.length * 2) - 1 ? 'border-r-3' : '' }` }
+                                className={ `relative flex w-14 h-48 shrink-0 flex-col border-t ${ isFirst ? 'border-l' : '' } ${ isLast ? 'border-r' : '' }` }
                             >
                                 {/* White Key */ }
                                 <button
                                     onMouseDown={ () => handleNoteClick(i) }
-                                    className={ `
-                                        h-full w-full rounded-b-xs transition-colors duration-200 cursor-pointer border
-                                        bg-key-white-bg 
-                                        border-key-white-border
-                                        active:bg-key-white-active
-                                        hover:opacity-90
-                                    ` }
+                                    className='h-full w-full rounded-b-sm transition-colors duration-200 cursor-pointer border bg-key-white-bg border-key-white-border active:bg-key-white-active hover:opacity-90'
                                 />
 
                                 {/* Black Key Overlay */ }
@@ -100,14 +106,8 @@ export default function Synth() {
                                             e.stopPropagation();
                                             handleNoteClick(i + 1);
                                         } }
-                                        className={ `
-                                            absolute left-full top-0 z-10 -translate-x-1/2 h-3/5 w-2/3 rounded-b-xs shadow-md
-                                            transition-colors duration-200 cursor-pointer border
-                                            bg-key-black-bg 
-                                            border-key-black-border
-                                            active:bg-key-black-active
-                                        ` }
                                         style={ { width: '60%' } }
+                                        className='absolute left-full top-0 z-10 -translate-x-1/2 h-3/5 rounded-b-sm shadow-md transition-colors duration-200 cursor-pointer border bg-key-black-bg border-key-black-border active:bg-key-black-active'
                                     />
                                 ) }
                             </div>

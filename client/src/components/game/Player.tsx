@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
-import * as React from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -12,8 +11,7 @@ import {
     type PlayerPose,
     type Card,
     MOVEMENT_SPEED,
-    ROTATION_SPEED,
-    SCENE_DATA
+    ROTATION_SPEED
 } from './GameConfig';
 import { SoftBlock, HandVisuals } from './GameAssets';
 
@@ -21,27 +19,43 @@ import { SoftBlock, HandVisuals } from './GameAssets';
 /* TYPES & INTERFACES                                                         */
 /* -------------------------------------------------------------------------- */
 
+// Helper to define behaviors that lock the player in place
+type SeatedBehavior = Extract<InteractionBehavior, { type: 'seat' | 'station' }>;
+
 type PlayerProps = {
+    // State Flags
     isPlaying: boolean;
     inputLocked?: boolean;
-    playerRef?: React.RefObject<THREE.Group | null>;
+    isRemote?: boolean;
+
+    // Data
+    peerId?: string;
+    name?: string;
     initialPos: [number, number, number];
     initialRot: number;
+
+    // Environment
     barriers: Barrier[];
     portals: PortalDef[];
     interactables?: Interactable[];
+
+    // Game State (Local or Remote)
+    seatData?: { seatIndex: number; hand: Card[] } | null;
+    remoteData?: {
+        pos: [number, number, number];
+        rot: number;
+        pose?: PlayerPose;
+        isFading?: boolean;
+        name?: string;
+    };
+
+    // Callbacks (Local only)
+    playerRef?: React.RefObject<THREE.Group | null>;
     onPortalEnter: (target: PortalDef) => void;
     onInteractChange?: (label: string | null) => void;
     onPoseChange?: (pose: PlayerPose) => void;
     onSeatInteract?: (seatIndex: number) => void;
-    isRemote?: boolean;
-    remoteData?: { pos: [number, number, number]; rot: number; pose?: PlayerPose; isFading?: boolean; name?: string }; // [!code change] Added name type
-    peerId?: string;
-    seatData?: { seatIndex: number; hand: Card[] } | null;
-    name?: string; // [!code change] Added name prop
 };
-
-type SeatedBehavior = Exclude<InteractionBehavior, { type: 'trigger' }>;
 
 /* -------------------------------------------------------------------------- */
 /* PLAYER COMPONENT                                                           */
@@ -64,7 +78,7 @@ export const Player = ({
                            remoteData,
                            peerId,
                            seatData,
-                           name // [!code change] Destructure name
+                           name
                        }: PlayerProps) => {
     // Scene Refs
     const groupRef = useRef<THREE.Group>(null);
@@ -98,13 +112,14 @@ export const Player = ({
 
     // Theme
     const primaryColor = useThemeColor('--brand-primary');
-    // Use brand color for shirt to stand out against background
     const shirtColor = useThemeColor('--player-torso');
     const headColor = useThemeColor('--player-head');
     const pantsColor = useThemeColor('--player-legs');
 
-    // [!code change] Determine displayed name
-    const displayName = isRemote ? (remoteData?.name || peerId?.substring(0, 4)) : (name || peerId?.substring(0, 4));
+    // Determine Display Name
+    const displayName = isRemote
+        ? (remoteData?.name || peerId?.substring(0, 4))
+        : (name || peerId?.substring(0, 4));
 
     /* -------------------------------------------------------------------------- */
     /* LIFECYCLE & SEATING HELPER                                                 */
@@ -114,13 +129,19 @@ export const Player = ({
         if (playerRef && groupRef.current) playerRef.current = groupRef.current;
     }, [playerRef]);
 
-    // Helper to resolve seat position
+    /**
+     * Resolves the coordinate/rotation configuration for the current seat/station.
+     * Uses the passed `interactables` list to find the matching behavior.
+     */
     const getSeatConfig = (): SeatedBehavior | null => {
+        // 1. Check for specific Game Seat (e.g. Blackjack)
         if (seatData) {
-            const items = SCENE_DATA['bar'].interactables;
-            const item = items?.find(i => i.behavior.type === 'seat' && i.behavior.seatIndex === seatData.seatIndex);
+            const item = interactables.find(
+                i => i.behavior.type === 'seat' && i.behavior.seatIndex === seatData.seatIndex
+            );
             return item ? (item.behavior as SeatedBehavior) : null;
         }
+        // 2. Check for generic Station (e.g. Bench/Stool)
         if (activeInteraction?.behavior.type === 'station') {
             return activeInteraction.behavior as SeatedBehavior;
         }
@@ -169,6 +190,7 @@ export const Player = ({
                 snappedSeatIndex.current = currentIdx;
             }
 
+            // If we just sat down, ensure internal lock is clear so we can exit later
             setActiveInteraction(activeInteraction);
             setIsInternalLocked(false);
             isInternalLockedRef.current = false;
@@ -182,13 +204,14 @@ export const Player = ({
             const exitPos = new THREE.Vector3(...prevSeatConfig.current.exitPosition);
             groupRef.current.position.copy(exitPos);
             prevSeatConfig.current = null;
-            snappedSeatIndex.current = null; // Reset snap tracker
+            snappedSeatIndex.current = null;
         }
 
         // 3. Handle Spawn Reset (Only if NOT seated and not exiting)
         else if (!seatData && !activeInteraction) {
-            snappedSeatIndex.current = null; // Reset snap tracker
+            snappedSeatIndex.current = null;
             const d = groupRef.current.position.distanceTo(new THREE.Vector3(...initialPos));
+            // If drifted too far (e.g. falling through floor), reset
             if (d > 20) {
                 groupRef.current.position.set(...initialPos);
                 if (visualsRef.current) {
@@ -225,12 +248,16 @@ export const Player = ({
 
             if (e.key.toLowerCase() === 'e' && groupRef.current) {
                 // 1. Join Seat (Priority)
-                if (potentialInteractionRef.current && potentialInteractionRef.current.behavior.type === 'seat' && onSeatInteract) {
+                if (
+                    potentialInteractionRef.current &&
+                    potentialInteractionRef.current.behavior.type === 'seat' &&
+                    onSeatInteract
+                ) {
                     onSeatInteract(potentialInteractionRef.current.behavior.seatIndex);
                     return;
                 }
 
-                // 2. Leave Station (Stools)
+                // 2. Leave Station (Stools/Benches)
                 if (activeInteraction) {
                     if (activeInteraction.behavior.type === 'station') {
                         const exitPos = new THREE.Vector3(...activeInteraction.behavior.exitPosition);
@@ -248,7 +275,10 @@ export const Player = ({
                 }
             }
         };
-        const handleKeyUp = (e: KeyboardEvent) => keys.current[e.key.toLowerCase()] = false;
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            keys.current[e.key.toLowerCase()] = false;
+        };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
@@ -272,8 +302,10 @@ export const Player = ({
     const animateWalk = (time: number, speedMultiplier = 1) => {
         if (!visualsRef.current) return;
         const t = time * 15 * speedMultiplier;
+
         visualsRef.current.rotation.z = Math.sin(t) * 0.05;
         visualsRef.current.position.y = (Math.sin(t * 2) + 1) * 0.05;
+
         if (leftLegRef.current) leftLegRef.current.rotation.x = Math.sin(t) * 0.8;
         if (rightLegRef.current) rightLegRef.current.rotation.x = Math.sin(t + Math.PI) * 0.8;
         if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(t + Math.PI) * 0.6;
@@ -288,7 +320,9 @@ export const Player = ({
         if (pose === 'sit') legAngle = -Math.PI / 2;
 
         const lerpLimb = (ref: React.RefObject<THREE.Group | null>, target: number) => {
-            if (ref.current) ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, target, delta * 10);
+            if (ref.current) {
+                ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, target, delta * 10);
+            }
         };
         lerpLimb(leftLegRef, legAngle);
         lerpLimb(rightLegRef, legAngle);
@@ -300,8 +334,11 @@ export const Player = ({
         if (!visualsRef.current) return;
         visualsRef.current.rotation.z = THREE.MathUtils.lerp(visualsRef.current.rotation.z, 0, 0.1);
         visualsRef.current.position.y = THREE.MathUtils.lerp(visualsRef.current.position.y, 0, 0.1);
+
         const lerpRot = (ref: React.RefObject<THREE.Group | null>) => {
-            if (ref.current) ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, 0, 0.1);
+            if (ref.current) {
+                ref.current.rotation.x = THREE.MathUtils.lerp(ref.current.rotation.x, 0, 0.1);
+            }
         };
         [leftLegRef, rightLegRef, leftArmRef, rightArmRef].forEach(lerpRot);
     };
@@ -356,28 +393,41 @@ export const Player = ({
         }
 
         if (isSeated && seatConfig) {
+            // If seated, we snap to the chair/station position aggressively
             const seatPos = new THREE.Vector3(...seatConfig.anchorPosition);
             groupRef.current.position.lerp(seatPos, delta * 10);
 
+            // Allow looking around while seated using A/D keys
             if (dx !== 0) {
                 targetRotation.current += (dx * -1) * 3 * delta;
             }
 
             animateStationPose('sit', delta);
         } else {
+            // Forward movement locking (for portal transitions)
             if (isInternalLocked) dz -= 1;
 
             const isMovingInput = dx !== 0 || dz !== 0;
-            if (isMovingInput && !isSeated) targetRotation.current = Math.atan2(dx, dz);
 
+            // Calculate Rotation
+            if (isMovingInput && !isSeated) {
+                targetRotation.current = Math.atan2(dx, dz);
+            }
+
+            // Apply Velocity
             if (isMovingInput && (dz !== 0 || dx !== 0)) {
                 const len = Math.sqrt(dx * dx + dz * dz);
                 const nx = dx / len, nz = dz / len;
                 const nextX = groupRef.current.position.x + nx * MOVEMENT_SPEED * delta;
                 const nextZ = groupRef.current.position.z + nz * MOVEMENT_SPEED * delta;
 
-                if (!checkCollision(nextX, groupRef.current.position.z)) groupRef.current.position.x = nextX;
-                if (!checkCollision(groupRef.current.position.x, nextZ)) groupRef.current.position.z = nextZ;
+                // Collision Checks
+                if (!checkCollision(nextX, groupRef.current.position.z)) {
+                    groupRef.current.position.x = nextX;
+                }
+                if (!checkCollision(groupRef.current.position.x, nextZ)) {
+                    groupRef.current.position.z = nextZ;
+                }
 
                 animateWalk(state.clock.elapsedTime);
             } else {
@@ -394,7 +444,9 @@ export const Player = ({
 
             for (const item of interactables) {
                 const target = new THREE.Vector3(...item.position);
+                // Check distance and if player is generally facing the object
                 const isFacing = forward.dot(target.clone().sub(pPos).normalize()) > 0.4;
+
                 if (pPos.distanceTo(target) <= item.interactionRadius && isFacing) {
                     found = item;
                     break;
@@ -408,6 +460,7 @@ export const Player = ({
                 if (onInteractChange) onInteractChange(label);
             }
 
+            // Portal Scanning
             if (!isInternalLocked) {
                 for (const p of portals) {
                     if (groupRef.current.position.distanceTo(new THREE.Vector3(...p.position)) < 1.0) {
@@ -433,7 +486,7 @@ export const Player = ({
             {/* NAME TAG */ }
             { displayName && opacity > 0.1 && (
                 <Text
-                    position={ [0, 2.4, 0] } // [!code change] Raised Name Tag to 2.4 to be under cards (at 3.4)
+                    position={ [0, 2.4, 0] }
                     fontSize={ 0.2 }
                     color={ primaryColor }
                     anchorX='center'
@@ -445,7 +498,7 @@ export const Player = ({
                 </Text>
             ) }
 
-            {/* HAND VISUALS (For Card Game) */ }
+            {/* HAND VISUALS (Cards over head) */ }
             { seatData && seatData.hand.length > 0 && (
                 <HandVisuals hand={ seatData.hand } isLocal={ !isRemote }/>
             ) }
@@ -458,6 +511,7 @@ export const Player = ({
                     opacity={ opacity }
                     transparent={ isTrans }
                 />
+                {/* Face Visor/Eyes */ }
                 <mesh position={ [0, 1.45, 0.26] } castShadow>
                     <planeGeometry args={ [0.4, 0.1] }/>
                     <meshStandardMaterial
@@ -468,6 +522,8 @@ export const Player = ({
                         transparent={ isTrans }
                     />
                 </mesh>
+
+                {/* Torso */ }
                 <SoftBlock
                     args={ [0.6, 0.7, 0.4] }
                     color={ shirtColor }
@@ -475,23 +531,45 @@ export const Player = ({
                     opacity={ opacity }
                     transparent={ isTrans }
                 />
+
+                {/* Limbs */ }
                 <group position={ [-0.15, 0.5, 0] } ref={ leftLegRef }>
-                    <SoftBlock args={ [0.2, 0.5, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }
-                               opacity={ opacity } transparent={ isTrans }/>
+                    <SoftBlock
+                        args={ [0.2, 0.5, 0.2] }
+                        color={ pantsColor }
+                        position={ [0, -0.25, 0] }
+                        opacity={ opacity }
+                        transparent={ isTrans }
+                    />
                 </group>
                 <group position={ [0.15, 0.5, 0] } ref={ rightLegRef }>
-                    <SoftBlock args={ [0.2, 0.5, 0.2] } color={ pantsColor } position={ [0, -0.25, 0] }
-                               opacity={ opacity } transparent={ isTrans }/>
+                    <SoftBlock
+                        args={ [0.2, 0.5, 0.2] }
+                        color={ pantsColor }
+                        position={ [0, -0.25, 0] }
+                        opacity={ opacity }
+                        transparent={ isTrans }
+                    />
                 </group>
                 <group position={ [-0.38, 1.15, 0] } ref={ leftArmRef }>
-                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }
-                               opacity={ opacity } transparent={ isTrans }/>
+                    <SoftBlock
+                        args={ [0.18, 0.5, 0.18] }
+                        color={ shirtColor }
+                        position={ [0, -0.2, 0] }
+                        opacity={ opacity }
+                        transparent={ isTrans }
+                    />
                 </group>
                 <group position={ [0.38, 1.15, 0] } ref={ rightArmRef }>
-                    <SoftBlock args={ [0.18, 0.5, 0.18] } color={ shirtColor } position={ [0, -0.2, 0] }
-                               opacity={ opacity } transparent={ isTrans }/>
+                    <SoftBlock
+                        args={ [0.18, 0.5, 0.18] }
+                        color={ shirtColor }
+                        position={ [0, -0.2, 0] }
+                        opacity={ opacity }
+                        transparent={ isTrans }
+                    />
                 </group>
             </group>
         </group>
     );
-}
+};

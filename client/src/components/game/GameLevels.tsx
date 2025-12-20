@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useThemeColor } from '../../hooks/useThemeColor';
-import type { Card } from './GameConfig.ts';
+import { SCENE_DATA } from './GameConfig';
+import type { Card } from './GameConfig';
 import {
     Floor,
     SoftBlock,
@@ -12,23 +13,29 @@ import {
     CardboardBox,
     Dumpster,
     BlackjackTable,
-    DealerNPC
+    DealerNPC,
+    Ground
 } from './GameAssets';
+
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
+
+type BaseProps = {
+    position: [number, number, number];
+    rotation?: [number, number, number];
+};
 
 /* -------------------------------------------------------------------------- */
 /* SHARED COMPONENTS                                                          */
 /* -------------------------------------------------------------------------- */
 
-const BarStool = ({ position, rotation = [0, 0, 0] }: {
-    position: [number, number, number],
-    rotation?: [number, number, number]
-}) => {
-    const woodColor = useThemeColor('--border-base');
-    const legColor = useThemeColor('--text-muted');
+const BarStool = ({ position, rotation = [0, 0, 0] }: BaseProps) => {
+    const woodColor = useThemeColor('--game-wood'); // Updated to use game-wood
+    const legColor = useThemeColor('--game-metal'); // Updated to use game-metal
 
     return (
         <group position={ position } rotation={ rotation }>
-            {/* [!code change] Restored Taller Height (0.8) */ }
             <SoftBlock args={ [0.45, 0.1, 0.45] } color={ woodColor } position={ [0, 0.8, 0] }/>
             <SoftBlock args={ [0.08, 0.8, 0.08] } color={ legColor } position={ [0, 0.4, 0] }/>
             <SoftBlock args={ [0.4, 0.05, 0.4] } color={ legColor } position={ [0, 0.025, 0] }/>
@@ -36,11 +43,8 @@ const BarStool = ({ position, rotation = [0, 0, 0] }: {
     );
 };
 
-const BlackjackChair = ({ position, rotation = [0, 0, 0] }: {
-    position: [number, number, number],
-    rotation?: [number, number, number]
-}) => {
-    const woodColor = useThemeColor('--border-base');
+const BlackjackChair = ({ position, rotation = [0, 0, 0] }: BaseProps) => {
+    const woodColor = useThemeColor('--game-wood'); // Updated to use game-wood
     const cushionColor = useThemeColor('--text-muted');
     const legColor = useThemeColor('--game-metal');
 
@@ -60,20 +64,22 @@ const BlackjackChair = ({ position, rotation = [0, 0, 0] }: {
 /* BAR LEVEL SCENE                                                            */
 /* -------------------------------------------------------------------------- */
 
-export const BarLevel = ({ isDoorOpen, dealerHand = [] }: {
-    isDoorOpen: boolean,
-    playerRef?: any,
-    dealerHand?: Card[]
+export const BarLevel = ({
+                             isDoorOpen,
+                             dealerHand = []
+                         }: {
+    isDoorOpen: boolean;
+    dealerHand?: Card[];
 }) => {
     // Theme & Config
     const surfaceColor = useThemeColor('--bg-surface-highlight');
-    const woodColor = useThemeColor('--border-base');
+    const woodColor = useThemeColor('--game-wood'); // Using semantic game-wood
     const wallColor = useThemeColor('--bg-page');
     const shelfColor = useThemeColor('--bg-surface-highlight');
     const palette = [
+        useThemeColor('--game-accent'), // Using semantic accent
         useThemeColor('--brand-primary'),
-        useThemeColor('--text-main'),
-        useThemeColor('--border-base')
+        useThemeColor('--text-main')
     ];
 
     const barHeight = 1.3;
@@ -81,73 +87,106 @@ export const BarLevel = ({ isDoorOpen, dealerHand = [] }: {
 
     // Procedural Bottle Generation
     const { bottomRow, topRow } = useMemo(() => {
-        const generateRow = (count: number, widthSpread: number) => new Array(count).fill(0).map((_, i) => ({
-            id: Math.random(),
-            x: -(widthSpread / 2) + (widthSpread / count) / 2 + (i * (widthSpread / count)),
-            colorIndex: Math.floor(Math.random() * 3),
-            height: 0.3 + Math.random() * 0.4,
-            width: 0.15 + Math.random() * 0.1
-        }));
+        const generateRow = (count: number, widthSpread: number) =>
+            new Array(count).fill(0).map((_, i) => ({
+                id: Math.random(),
+                x: -(widthSpread / 2) + (widthSpread / count) / 2 + i * (widthSpread / count),
+                colorIndex: Math.floor(Math.random() * 3),
+                height: 0.3 + Math.random() * 0.4,
+                width: 0.15 + Math.random() * 0.1
+            }));
         return { bottomRow: generateRow(8, 5), topRow: generateRow(6, 4) };
     }, []);
+
+    const interactables = SCENE_DATA.bar.interactables || [];
+    const portals = SCENE_DATA.bar.portals;
 
     return (
         <group>
             <Floor/>
 
-            {/* Architecture: Bar Structure & Counter */ }
+            {/* STATIC ARCHITECTURE */ }
             <group position={ [-4, 0, 0] }>
                 {/* Front Section */ }
                 <group position={ [0, 0, -1.5] }>
-                    <SoftBlock args={ [6, barHeight, barThickness] } color={ surfaceColor }
-                               position={ [0, barHeight / 2, 0] }/>
-                    <SoftBlock args={ [6.2, 0.15, barThickness + 0.2] } color={ woodColor }
-                               position={ [0, barHeight + 0.075, 0] }/>
+                    <SoftBlock
+                        args={ [6, barHeight, barThickness] }
+                        color={ surfaceColor }
+                        position={ [0, barHeight / 2, 0] }
+                    />
+                    <SoftBlock
+                        args={ [6.2, 0.15, barThickness + 0.2] }
+                        color={ woodColor }
+                        position={ [0, barHeight + 0.075, 0] }
+                    />
                 </group>
 
                 {/* Left Section */ }
                 <group position={ [-2.7, 0, -2.8] }>
-                    <SoftBlock args={ [barThickness, barHeight, 2.5] } color={ surfaceColor }
-                               position={ [0, barHeight / 2, 0] }/>
-                    <SoftBlock args={ [barThickness + 0.2, 0.15, 2.7] } color={ woodColor }
-                               position={ [0, barHeight + 0.075, -0.1] }/>
+                    <SoftBlock
+                        args={ [barThickness, barHeight, 2.5] }
+                        color={ surfaceColor }
+                        position={ [0, barHeight / 2, 0] }
+                    />
+                    <SoftBlock
+                        args={ [barThickness + 0.2, 0.15, 2.7] }
+                        color={ woodColor }
+                        position={ [0, barHeight + 0.075, -0.1] }
+                    />
                 </group>
 
                 {/* Right Section */ }
                 <group position={ [2.7, 0, -2.125] }>
-                    <SoftBlock args={ [barThickness, barHeight, 1.25] } color={ surfaceColor }
-                               position={ [0, barHeight / 2, 0] }/>
-                    <SoftBlock args={ [barThickness + 0.2, 0.15, 1.25] } color={ woodColor }
-                               position={ [0, barHeight + 0.075, 0] }/>
+                    <SoftBlock
+                        args={ [barThickness, barHeight, 1.25] }
+                        color={ surfaceColor }
+                        position={ [0, barHeight / 2, 0] }
+                    />
+                    <SoftBlock
+                        args={ [barThickness + 0.2, 0.15, 1.25] }
+                        color={ woodColor }
+                        position={ [0, barHeight + 0.075, 0] }
+                    />
                 </group>
-
-                {/* Bar Stools */ }
-                { [-2, 0, 2].map((xOffset, i) => (
-                    <BarStool key={ i } position={ [xOffset, 0, -0.6] }/>
-                )) }
             </group>
 
-            {/* Characters */ }
+            { interactables
+                .filter(i => i.id.startsWith('stool'))
+                .map((stool) => (
+                    <BarStool
+                        key={ stool.id }
+                        position={ stool.position }
+                        rotation={ [0, stool.behavior.type === 'station' ? stool.behavior.anchorRotation : 0, 0] }
+                    />
+                )) }
+
             <Bartender position={ [-4, 0, -2.8] } rotation={ [0, 0, 0] }/>
 
-            {/* Blackjack Area */ }
-            <group position={ [3, 0, 2.5] }>
-                <BlackjackTable position={ [0, 0, 0] } rotation={ [0, 0, 0] }/>
-                <DealerNPC position={ [0, 0, -2.0] } rotation={ [0, 0, 0] } hand={ dealerHand }/>
+            {/* BLACKJACK AREA */ }
+            <group>
+                <BlackjackTable position={ [3, 0, 2.5] } rotation={ [0, 0, 0] }/>
+                <DealerNPC position={ [3, 0, 0.5] } rotation={ [0, 0, 0] } hand={ dealerHand }/>
 
-                <BlackjackChair position={ [-3.8, 0, 0] } rotation={ [0, Math.PI / 2, 0] }/>
-                <BlackjackChair position={ [-2.0, 0, 1.8] } rotation={ [0, Math.PI, 0] }/>
-                <BlackjackChair position={ [0.0, 0, 1.8] } rotation={ [0, Math.PI, 0] }/>
-                <BlackjackChair position={ [2.0, 0, 1.8] } rotation={ [0, Math.PI, 0] }/>
-                <BlackjackChair position={ [3.8, 0, 0] } rotation={ [0, -Math.PI / 2, 0] }/>
+                { interactables
+                    .filter((i) => i.behavior.type === 'seat')
+                    .map((seat) => (
+                        <BlackjackChair
+                            key={ seat.id }
+                            position={ seat.position }
+                            rotation={ [
+                                0,
+                                seat.behavior.type === 'seat' ? seat.behavior.anchorRotation : 0,
+                                0
+                            ] }
+                        />
+                    )) }
             </group>
 
-            {/* Environment: Walls & Shelves */ }
+            {/* ENVIRONMENT DECOR */ }
             <group position={ [0, 0, -4] }>
                 <SoftBlock args={ [80, 8, 1] } color={ wallColor } position={ [0, 4, -0.6] }/>
 
                 <group position={ [-4, 0, 0] }>
-                    {/* Bottom Shelf at 2.2 */ }
                     <SoftBlock args={ [5.5, 0.1, 0.4] } color={ shelfColor } position={ [0, 2.2, 0] }/>
                     { bottomRow.map((b) => (
                         <SimpleBottle
@@ -159,7 +198,6 @@ export const BarLevel = ({ isDoorOpen, dealerHand = [] }: {
                         />
                     )) }
 
-                    {/* Top Shelf at 3.2 */ }
                     <SoftBlock args={ [5.5, 0.1, 0.4] } color={ shelfColor } position={ [0, 3.2, 0] }/>
                     { topRow.map((b) => (
                         <SimpleBottle
@@ -173,18 +211,33 @@ export const BarLevel = ({ isDoorOpen, dealerHand = [] }: {
                 </group>
             </group>
 
-            {/* Exits */ }
-            <PortalDoor position={ [6, 0, -3.9] } label='EXIT' isOpen={ isDoorOpen }/>
+            { portals.map((portal, index) => (
+                <PortalDoor
+                    key={ index }
+                    position={ portal.position }
+                    label={ portal.targetScene.toUpperCase() === 'ALLEY' ? 'EXIT' : 'DOOR' }
+                    isOpen={ isDoorOpen }
+                />
+            )) }
         </group>
     );
 };
 
+/* -------------------------------------------------------------------------- */
+/* ALLEY LEVEL SCENE                                                          */
+/* -------------------------------------------------------------------------- */
+
 export const AlleyLevel = ({ isDoorOpen }: { isDoorOpen: boolean }) => {
     const wallColor = useThemeColor('--bg-surface');
+    const interactables = SCENE_DATA.alley.interactables || [];
+    const portals = SCENE_DATA.alley.portals;
+
+    const benchData = interactables.find(i => i.id === 'alley-bench');
 
     return (
         <group>
-            <Floor colorOverride='#1a1a1a'/>
+            {/* Updated to use semantic grass toggle for the alleyway */ }
+            <Ground useGrass/>
 
             {/* Architecture: Walls & Boundaries */ }
             <group position={ [0, 0, -4] }>
@@ -193,17 +246,25 @@ export const AlleyLevel = ({ isDoorOpen }: { isDoorOpen: boolean }) => {
                 <SoftBlock args={ [0.3, 12, 0.3] } color='#333' position={ [-5, 6, 0] }/>
             </group>
 
-            {/* Props: Clutter & Furniture */ }
+            {/* Props: Clutter */ }
             <Dumpster position={ [-5, 0, -2] } rotation={ [0, 0.2, 0] }/>
             <CardboardBox position={ [-3, 0.4, -2.5] } rotation={ [0, 0.5, 0] } size={ 0.8 }/>
             <CardboardBox position={ [-3, 1.1, -2.5] } rotation={ [0, 0.2, 0] } size={ 0.6 }/>
-            <Bench position={ [1.5, 0, -3.6] } rotation={ [0, 0, 0] }/>
 
-            {/* Characters */ }
-            <AlleySmoker position={ [1.0, 0.45, -3.6] } rotation={ [0, 0, 0] }/>
+            { benchData && (
+                <Bench position={ benchData.position } rotation={ [0, 0, 0] }/>
+            ) }
 
-            {/* Exits */ }
-            <PortalDoor position={ [6, 0, -3.9] } label='BAR' isOpen={ isDoorOpen }/>
+            <AlleySmoker position={ [1.3, 0.45, -3.6] } rotation={ [0, 0, 0] }/>
+
+            { portals.map((portal, index) => (
+                <PortalDoor
+                    key={ index }
+                    position={ portal.position }
+                    label='BAR'
+                    isOpen={ isDoorOpen }
+                />
+            )) }
         </group>
     );
 };

@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode, useLayoutEffect } from 'react';
-import * as React from 'react';
+import { useState, useEffect, useRef, useLayoutEffect, type ReactNode, type MouseEvent } from 'react';
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -14,6 +13,16 @@ interface FloatingWindowProps {
     initialPosition?: { x: number; y: number };
     initialSize?: { width: number; height: number };
     onClose?: () => void;
+}
+
+interface DragState {
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+    startWidth: number;
+    startHeight: number;
+    minY: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -38,15 +47,7 @@ export default function FloatingWindow({
 
     // Refs for state tracking during events
     const preMaximizeState = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
-    const actionStart = useRef<{
-        startX: number;
-        startY: number;
-        startLeft: number;
-        startTop: number;
-        startWidth: number;
-        startHeight: number;
-        minY: number;
-    } | null>(null);
+    const actionStart = useRef<DragState | null>(null);
 
     /* -------------------------------------------------------------------------- */
     /* LIFECYCLE & INITIALIZATION                                                 */
@@ -67,7 +68,7 @@ export default function FloatingWindow({
     /* HANDLERS: WINDOW CONTROL                                                   */
     /* -------------------------------------------------------------------------- */
 
-    const handleToggleMaximize = (e: React.MouseEvent) => {
+    const handleToggleMaximize = (e: MouseEvent) => {
         e.stopPropagation();
 
         if (isMaximized) {
@@ -96,8 +97,9 @@ export default function FloatingWindow({
     /* HANDLERS: DRAG & RESIZE INPUT                                              */
     /* -------------------------------------------------------------------------- */
 
-    const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleDragStart = (e: MouseEvent<HTMLDivElement>) => {
         if (isMaximized) return;
+        // Allow dragging only from header, ignore buttons inside header
         if (e.target !== e.currentTarget && (e.target as HTMLElement).closest('button')) return;
 
         e.preventDefault();
@@ -111,13 +113,13 @@ export default function FloatingWindow({
             startY: e.clientY,
             startLeft: position.x,
             startTop: position.y,
-            startWidth: 0,
-            startHeight: 0,
+            startWidth: 0, // Unused for drag
+            startHeight: 0, // Unused for drag
             minY: currentNavbarHeight,
         };
     };
 
-    const handleResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleResizeStart = (e: MouseEvent<HTMLDivElement>) => {
         if (isMaximized) return;
 
         e.preventDefault();
@@ -127,8 +129,8 @@ export default function FloatingWindow({
         actionStart.current = {
             startX: e.clientX,
             startY: e.clientY,
-            startLeft: 0,
-            startTop: 0,
+            startLeft: 0, // Unused for resize
+            startTop: 0, // Unused for resize
             startWidth: size.width,
             startHeight: size.height,
             minY: 0,
@@ -140,7 +142,8 @@ export default function FloatingWindow({
     /* -------------------------------------------------------------------------- */
 
     useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
+        // Native DOM Event Handler
+        const handleMouseMove = (e: globalThis.MouseEvent) => {
             if (!actionStart.current) return;
 
             if (isResizing) {
@@ -166,6 +169,7 @@ export default function FloatingWindow({
                 let newX = actionStart.current.startLeft + dx;
                 let newY = actionStart.current.startTop + dy;
 
+                // Constrain to viewport
                 newX = Math.max(0, Math.min(newX, maxX));
                 newY = Math.max(minY, Math.min(newY, maxY));
 
@@ -182,6 +186,7 @@ export default function FloatingWindow({
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
         }
+
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);

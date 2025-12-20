@@ -1,13 +1,13 @@
 import type { Card, BJGameState } from '../GameConfig';
 
-/* -------------------------------------------------------------------------- */
-/* DECK MANAGEMENT                                                            */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * Generates a standard 52-card deck using a Fisher-Yates shuffle.
+ */
 export const generateDeck = (): Card[] => {
     const suits = ['♠', '♥', '♣', '♦'] as const;
     const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
     const deck: Card[] = [];
+
     for (const s of suits) {
         for (const r of ranks) {
             let val = parseInt(r);
@@ -16,31 +16,36 @@ export const generateDeck = (): Card[] => {
             deck.push({ suit: s, rank: r, value: val });
         }
     }
-    return deck.sort(() => Math.random() - 0.5);
+
+    // Fisher-Yates Shuffle
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+
+    return deck;
 };
 
-/* -------------------------------------------------------------------------- */
-/* HAND EVALUATION                                                            */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * Calculates the numeric value of a hand, automatically adjusting Aces from 11 to 1 if needed.
+ */
 export const calculateHand = (cards: Card[]): number => {
     let sum = 0;
     let aces = 0;
+
     for (const c of cards) {
         if (c.rank === 'A') aces++;
         sum += c.value;
     }
+
     // Adjust aces
     while (sum > 21 && aces > 0) {
         sum -= 10;
         aces--;
     }
+
     return sum;
 };
-
-/* -------------------------------------------------------------------------- */
-/* GAME STATE TRANSITIONS                                                     */
-/* -------------------------------------------------------------------------- */
 
 export const createInitialState = (): BJGameState => ({
     phase: 'idle',
@@ -60,18 +65,25 @@ export const resetForBetting = (current: BJGameState): BJGameState => ({
     ...current,
     phase: 'betting',
     dealerHand: [],
-    seats: current.seats.map(s => s.status !== 'empty' ? ({ ...s, hand: [], bet: 0, status: 'betting' }) : s),
+    seats: current.seats.map(s =>
+        s.status !== 'empty'
+            ? { ...s, hand: [], bet: 0, status: 'betting' }
+            : s
+    ),
     activeSeatIndex: -1
 });
 
 /**
  * Advances the game to the next player, or runs the dealer turn if all players are done.
- * Mutates the deck (pops cards) for the dealer.
+ *
+ * @param currentState - The current game state (immutable).
+ * @param deck - The current game deck (mutable - cards will be popped).
  */
 export const processNextTurn = (currentState: BJGameState, deck: Card[]): BJGameState => {
-    // Clone state to avoid direct mutation of the previous render cycle
-    const next = {
+    // Deep clone specific parts of state we intend to modify
+    const next: BJGameState = {
         ...currentState,
+        dealerHand: [...currentState.dealerHand],
         seats: currentState.seats.map(s => ({ ...s }))
     };
 
@@ -94,19 +106,27 @@ export const processNextTurn = (currentState: BJGameState, deck: Card[]): BJGame
     let dealerVal = calculateHand(next.dealerHand);
     while (dealerVal < 17) {
         const card = deck.pop();
-        if (card) next.dealerHand.push(card);
-        else break; // Should effectively never happen with a fresh deck
+        if (card) {
+            next.dealerHand.push(card);
+        } else {
+            // Deck empty
+            break;
+        }
         dealerVal = calculateHand(next.dealerHand);
     }
 
     // 3. Determine Winners (Payout Phase)
     next.phase = 'payout';
+
     next.seats.forEach(s => {
-        // We only evaluate players who have a valid standing hand (or are stuck 'playing' which ends now)
+        // Evaluate players who stood or were still playing (and didn't bust previously)
         if (s.status === 'stand' || s.status === 'playing') {
             const pVal = calculateHand(s.hand);
 
-            if (dealerVal > 21 || pVal > dealerVal) {
+            if (pVal > 21) {
+                // Safety check: if player somehow stood with > 21
+                s.status = 'lost';
+            } else if (dealerVal > 21 || pVal > dealerVal) {
                 s.status = 'won';
             } else if (pVal === dealerVal) {
                 s.status = 'push';

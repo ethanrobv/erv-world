@@ -1,6 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import * as React from 'react';
-import { type DataConnection } from 'peerjs';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import type { DataConnection } from 'peerjs';
 
 // 3D & Effects
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -8,11 +7,13 @@ import { PerspectiveCamera } from '@react-three/drei';
 import { EffectComposer, Bloom, Pixelation } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
-// Game Logic & State
+// Game Context & Hooks
 import { useNetwork } from '../context/NetworkContext';
 import { useGameP2P } from '../hooks/useGameP2P';
 import { useWorkerInterval } from '../hooks/useWorkerInterval';
 import { useThemeColor } from '../hooks/useThemeColor';
+
+// Config & Types
 import {
     type RemotePlayerState,
     type GameState,
@@ -26,7 +27,7 @@ import {
     FADE_OUT_DURATION
 } from './game/GameConfig';
 
-// Blackjack Logic
+// Logic
 import {
     generateDeck,
     calculateHand,
@@ -40,7 +41,7 @@ import { BarLevel, AlleyLevel } from './game/GameLevels';
 import { Player } from './game/Player';
 import {
     MainMenu,
-    PauseMenu, // [!code change] Added PauseMenu
+    PauseMenu,
     TransitionOverlay,
     InteractionPrompt,
     NetworkIndicator,
@@ -52,6 +53,24 @@ import {
 /* NETWORK SYNC HELPER                                                        */
 
 /* -------------------------------------------------------------------------- */
+
+interface NetworkSyncProps {
+    playerRef: React.RefObject<THREE.Group | null>;
+    peerId: string | null;
+    isHost: boolean;
+    hostConn: DataConnection | null;
+    connections: DataConnection[];
+    gameState: GameState;
+    interactionLabel: string | null;
+    playerPose: PlayerPose;
+    setRemotePlayers: React.Dispatch<React.SetStateAction<Record<string, RemotePlayerState>>>;
+    worldStateRef: React.RefObject<Record<string, RemotePlayerState>>;
+    currentScene: SceneType;
+    addAlert: (msg: string) => void;
+    bjState: BJGameState;
+    setPing?: (ping: number) => void;
+    playerName: string;
+}
 
 function NetworkSync({
                          playerRef,
@@ -68,28 +87,12 @@ function NetworkSync({
                          addAlert,
                          bjState,
                          setPing,
-                         playerName // [!code change] Added name
-                     }: {
-    playerRef: React.RefObject<THREE.Group | null>;
-    peerId: string | null;
-    isHost: boolean;
-    hostConn: any;
-    connections: DataConnection[];
-    gameState: GameState;
-    interactionLabel: string | null;
-    playerPose: PlayerPose;
-    setRemotePlayers: React.Dispatch<React.SetStateAction<Record<string, RemotePlayerState>>>;
-    worldStateRef: React.RefObject<Record<string, RemotePlayerState>>;
-    currentScene: SceneType;
-    addAlert: (msg: string) => void;
-    bjState: BJGameState;
-    setPing?: (ping: number) => void;
-    playerName: string;
-}) {
+                         playerName
+                     }: NetworkSyncProps) {
     const lastBroadcastRef = useRef(0);
     const lastPruneRef = useRef(0);
 
-    const BROADCAST_RATE_MS = 33;
+    const BROADCAST_RATE_MS = 33; // ~30 updates per second
     const PRUNE_CHECK_RATE_MS = 500;
     const TIMEOUT_MS = 2000;
 
@@ -98,6 +101,7 @@ function NetworkSync({
         connectionsRef.current = connections;
     }, [connections]);
 
+    // Host Heartbeat
     useWorkerInterval(() => {
         if (!isHost) return;
         const now = Date.now();
@@ -108,11 +112,13 @@ function NetworkSync({
         }
     }, isHost ? 500 : null);
 
+    // Client Ping
     useWorkerInterval(() => {
         if (isHost || !hostConn || !hostConn.open) return;
         hostConn.send({ type: 'PING', timestamp: Date.now() });
     }, 1000);
 
+    // Ping/Pong Handling
     useEffect(() => {
         if (isHost || !hostConn || !setPing) return;
         const handler = (data: any) => {
@@ -126,6 +132,7 @@ function NetworkSync({
         };
     }, [isHost, hostConn, setPing]);
 
+    // Host: Sync Blackjack State
     useEffect(() => {
         if (!isHost) return;
         connectionsRef.current.forEach((conn) => {
@@ -135,9 +142,11 @@ function NetworkSync({
         });
     }, [bjState, isHost]);
 
+    // Main Sync Loop
     useFrame(() => {
         if (gameState !== 'playing' || !playerRef.current || !peerId) return;
 
+        // Extract Visuals Rotation (Child mesh) vs Group Position
         const visuals = playerRef.current.children.find(c => c.type === 'Group') || playerRef.current.children[0];
         const nowMs = Date.now();
 
@@ -148,22 +157,24 @@ function NetworkSync({
             interaction: interactionLabel,
             scene: currentScene,
             lastSeen: nowMs,
-            name: playerName // [!code change] Sync Name
+            name: playerName
         };
 
         const shouldSend = (nowMs - lastBroadcastRef.current) > BROADCAST_RATE_MS;
 
         if (isHost) {
+            // 1. Update Host's local copy of world state
             const existing = worldStateRef.current[peerId];
             worldStateRef.current[peerId] = { ...existing, ...payload };
 
+            // 2. Prune disconnected players
             if ((nowMs - lastPruneRef.current) > PRUNE_CHECK_RATE_MS) {
                 lastPruneRef.current = nowMs;
                 const deadIds: string[] = [];
 
                 Object.entries(worldStateRef.current).forEach(([id, p]) => {
                     if (id === peerId) return;
-                    if (p.isFading) return;
+                    if (p.isFading) return; // Already fading out
                     if (p.lastSeen && (nowMs - p.lastSeen > TIMEOUT_MS)) {
                         deadIds.push(id);
                     }
@@ -174,6 +185,7 @@ function NetworkSync({
                         if (worldStateRef.current[id]) {
                             worldStateRef.current[id].isFading = true;
                             addAlert(`Player ${ id.substring(0, 4).toUpperCase() } Timed Out`);
+                            // Remove from state after fade duration
                             setTimeout(() => {
                                 const next = { ...worldStateRef.current };
                                 delete next[id];
@@ -184,6 +196,7 @@ function NetworkSync({
                 }
             }
 
+            // 3. Broadcast World State to all Clients
             if (shouldSend) {
                 const allIds = Object.keys(worldStateRef.current).sort();
                 const heirId = allIds.find(id => id !== peerId) || null;
@@ -202,6 +215,7 @@ function NetworkSync({
                 lastBroadcastRef.current = nowMs;
             }
         } else if (hostConn && hostConn.open && shouldSend) {
+            // Client: Send own update to Host
             hostConn.send({
                 type: 'PLAYER_UPDATE',
                 payload
@@ -219,39 +233,51 @@ function NetworkSync({
 
 export default function Game() {
     const { peerId } = useNetwork();
+
+    // Game State
     const [gameState, setGameState] = useState<GameState>('menu');
     const [currentScene, setCurrentScene] = useState<SceneType>('bar');
-
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [isInputLocked, setIsInputLocked] = useState(false);
-    const [isPaused, setIsPaused] = useState(false); // [!code change] Pause State
+    const [isPaused, setIsPaused] = useState(false);
 
-    const [playerSpawn, setPlayerSpawn] = useState<{ pos: [number, number, number], rot: number }>({
+    // Player State
+    const [playerSpawn, setPlayerSpawn] = useState<{ pos: [number, number, number]; rot: number }>({
         pos: [6, 0, -2.5],
         rot: Math.PI
     });
     const [interactionLabel, setInteractionLabel] = useState<string | null>(null);
     const [playerPose, setPlayerPose] = useState<PlayerPose>('idle');
-    const [systemMessages, setSystemMessages] = useState<Array<{ id: number, text: string }>>([]);
+    const [playerName, setPlayerName] = useState('');
+    const [money, setMoney] = useState(100);
+
+    // UI State
+    const [systemMessages, setSystemMessages] = useState<Array<{ id: number; text: string }>>([]);
     const [ping, setPing] = useState<number>(0);
 
-    const [money, setMoney] = useState(100);
-    const [playerName, setPlayerName] = useState(''); // [!code change] Player Name State
-
+    // Blackjack State
     const [bjState, setBjState] = useState<BJGameState>(createInitialState());
+    const deckRef = useRef<Card[]>([]);
 
     const mySeatIndex = bjState.seats.findIndex(s => s.peerId === peerId);
     const isSeated = mySeatIndex !== -1;
 
+    // Refs
     const playerRef = useRef<THREE.Group>(null);
+    const worldStateRef = useRef<Record<string, RemotePlayerState>>({});
+    const initializedConnections = useRef<WeakSet<DataConnection>>(new WeakSet());
+
+    /* -------------------------------------------------------------------------- */
+    /* ALERTS & UI HELPERS                                                        */
+    /* -------------------------------------------------------------------------- */
 
     const addAlert = useCallback((text: string) => {
         const id = Date.now();
         setSystemMessages(prev => [...prev, { id, text }]);
-        setTimeout(() => setSystemMessages(prev => prev.filter(m => m.id !== id)), 5000);
+        setTimeout(() => setSystemMessages(prev => prev.filter(m => m.id !== id)), 3000);
     }, []);
 
-    // [!code change] Pause Menu Toggle
+    // Pause Menu Toggle
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.code === 'Escape' && gameState === 'playing') {
@@ -267,7 +293,9 @@ export default function Game() {
         if (isSeated) setInteractionLabel(null);
     }, [isSeated]);
 
-    const deckRef = useRef<Card[]>([]);
+    /* -------------------------------------------------------------------------- */
+    /* BLACKJACK LOGIC                                                            */
+    /* -------------------------------------------------------------------------- */
 
     const runTurnCycle = useCallback((currentState: BJGameState) => {
         const nextState = processNextTurn(currentState, deckRef.current);
@@ -279,6 +307,7 @@ export default function Game() {
         return nextState;
     }, []);
 
+    // Win/Loss Notifications & Money Update
     const prevPhase = useRef(bjState.phase);
     useEffect(() => {
         if (prevPhase.current !== 'payout' && bjState.phase === 'payout' && mySeatIndex !== -1) {
@@ -289,18 +318,20 @@ export default function Game() {
                 addAlert(`You Won $${ seat.bet * multiplier }!`);
             } else if (seat.status === 'push') {
                 setMoney(m => m + seat.bet);
-                addAlert(`Push - Bet Returned`);
+                addAlert('Push - Bet Returned');
             }
         }
         prevPhase.current = bjState.phase;
     }, [bjState.phase, mySeatIndex, bjState.seats, addAlert]);
 
+    // Main Game Action Reducer
     const handleLocalAction = useCallback((action: string, seatIndex: number, amount?: number) => {
         let cardToDeal: Card | null = null;
         let newDeck: Card[] | null = null;
 
         const currentSeat = bjState.seats[seatIndex];
 
+        // 1. Deck Management
         if (action === 'HIT') {
             if (bjState.activeSeatIndex === seatIndex) {
                 cardToDeal = deckRef.current.pop() || null;
@@ -320,29 +351,48 @@ export default function Game() {
                 if (money >= amount) {
                     setMoney(m => m - amount);
                 } else {
-                    return;
+                    return; // Not enough money
                 }
             }
         }
 
         if (action === 'LEAVE') {
             if (seatIndex === mySeatIndex && currentSeat.status === 'betting') {
-                setMoney(m => m + currentSeat.bet);
+                setMoney(m => m + currentSeat.bet); // Refund bet if leaving before deal
             }
         }
 
+        // 2. State Update
         setBjState(prev => {
             const seat = prev.seats[seatIndex];
             if (!seat) return prev;
 
             if (action === 'LEAVE') {
                 const nextSeats = [...prev.seats];
-                nextSeats[seatIndex] = { peerId: null, hand: [], bet: 0, status: 'empty' };
-                const nextState = { ...prev, seats: nextSeats };
 
-                if (nextSeats.every(s => s.status === 'empty')) {
-                    nextState.phase = 'idle';
-                } else if (prev.activeSeatIndex === seatIndex) {
+                // 1. Empty the seat
+                nextSeats[seatIndex] = { peerId: null, hand: [], bet: 0, status: 'empty' };
+
+                const activeSeatedPlayers = nextSeats.filter(s => s.peerId !== null);
+
+                // 2. Handle empty table cleanup
+                if (activeSeatedPlayers.length === 0) {
+                    // Only alert if a real game was in progress (cards were already dealt)
+                    const shouldAlertForfeit = prev.phase === 'playing' || prev.phase === 'dealing';
+
+                    if (shouldAlertForfeit) {
+                        addAlert('Hand forfeited.');
+                    }
+
+                    // Reset to initial state (idle phase, clear cards)
+                    return createInitialState();
+                }
+
+                // 3. Handle logic if other players are still at the table
+                let nextState = { ...prev, seats: nextSeats };
+
+                // If it was the leaving player's turn, move to the next person automatically
+                if (prev.activeSeatIndex === seatIndex && prev.phase === 'playing') {
                     return runTurnCycle(nextState);
                 }
 
@@ -360,11 +410,13 @@ export default function Game() {
                 const seatedCount = nextSeats.filter(s => s.peerId).length;
                 const readyCount = nextSeats.filter(s => s.status === 'playing').length;
 
+                // Start game if everyone is ready
                 if (seatedCount > 0 && readyCount === seatedCount) {
                     nextState.phase = 'dealing';
                     if (newDeck) deckRef.current = newDeck;
                     else if (deckRef.current.length === 0) deckRef.current = generateDeck();
 
+                    // Deal initial hands
                     nextState.seats = nextSeats.map(s => {
                         if (s.status === 'playing') {
                             return { ...s, hand: [deckRef.current.pop()!, deckRef.current.pop()!] };
@@ -403,7 +455,7 @@ export default function Game() {
             }
             return prev;
         });
-    }, [runTurnCycle, bjState, money, mySeatIndex]);
+    }, [runTurnCycle, bjState, money, mySeatIndex, addAlert]);
 
     const handleInteractChange = useCallback((label: string | null) => {
         if (!isSeated) setInteractionLabel(label);
@@ -429,10 +481,12 @@ export default function Game() {
     const interactables = SCENE_DATA[currentScene].interactables || [];
     const isDoorOpen = isTransitioning;
 
-    const worldStateRef = useRef<Record<string, RemotePlayerState>>({});
+    /* -------------------------------------------------------------------------- */
+    /* P2P NETWORKING                                                             */
+    /* -------------------------------------------------------------------------- */
+
     const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayerState>>({});
     const [heirId, setHeirId] = useState<string | null>(null);
-    const initializedConnections = useRef<WeakSet<DataConnection>>(new WeakSet());
 
     const onPeerJoined = useCallback((id: string) => {
         addAlert(`Player ${ id.substring(0, 4).toUpperCase() } joined`);
@@ -468,6 +522,7 @@ export default function Game() {
         p2pError
     } = useGameP2P(onPeerJoined, onPeerLeft, heirId);
 
+    // Host Cleanup: Remove disconnected players from Blackjack seats
     useEffect(() => {
         if (!isHost) return;
         setBjState(prev => {
@@ -498,6 +553,7 @@ export default function Game() {
         }
     }, [p2pError, addAlert]);
 
+    // Host: Handle Incoming Data
     useEffect(() => {
         if (!isHost) return;
         connections.forEach((conn) => {
@@ -541,6 +597,7 @@ export default function Game() {
         });
     }, [isHost, connections, handleLocalAction]);
 
+    // Client: Handle Host Data
     useEffect(() => {
         if (isHost || !hostConn) return;
         const handleHostData = (data: any) => {
@@ -559,6 +616,7 @@ export default function Game() {
         };
     }, [hostConn, isHost]);
 
+    // Action Dispatcher (Network Abstraction)
     const sendBjAction = (action: string, payload: any = {}) => {
         if (isHost) {
             handleLocalAction(action, mySeatIndex, payload.amount);
@@ -589,6 +647,7 @@ export default function Game() {
         sendBjAction('LEAVE');
     };
 
+    // Alert Logic for Peer Disconnects
     const prevFadingRef = useRef<Set<string>>(new Set());
     useEffect(() => {
         if (isHost) return;
@@ -615,13 +674,19 @@ export default function Game() {
         }
     };
 
-    // [!code change] Handle Return to Menu
     const handleReturnToMenu = () => {
-        window.location.reload(); // Simple reload to clear P2P state cleanly
+        // Reload to ensure clean PeerJS socket disconnects
+        window.location.reload();
     };
 
-    const currentSeatLabel = isSeated
-        ? SCENE_DATA[currentScene].interactables?.find(i => i.behavior.type === 'seat' && i.behavior.seatIndex === mySeatIndex)?.label
+    const currentInteractable = SCENE_DATA[currentScene].interactables?.find(
+        (i) => i.behavior.type === 'seat' && i.behavior.seatIndex === mySeatIndex
+    );
+
+    const currentSeatLabel = isSeated ? currentInteractable?.label : null;
+
+    const activeExitLabel = isSeated
+        ? (currentInteractable?.behavior as any).exitLabel || 'Stand Up'
         : null;
 
     return (
@@ -631,7 +696,6 @@ export default function Game() {
             { !isSeated && <InteractionPrompt label={ interactionLabel }/> }
             <SystemFeed messages={ systemMessages }/>
 
-            {/* [!code change] Render Pause Menu */ }
             { isPaused && (
                 <PauseMenu
                     onResume={ () => setIsPaused(false) }
@@ -649,7 +713,7 @@ export default function Game() {
                     onLeave={ handleLeaveTable }
                     seatLabel={ currentSeatLabel }
                     money={ money }
-                    exitLabel={ interactionLabel }
+                    exitLabel={ activeExitLabel }
                 />
             ) }
 
@@ -657,19 +721,30 @@ export default function Game() {
                 <MainMenu
                     onHost={ handleHost }
                     onJoin={ handleJoin }
-                    onNameChange={ setPlayerName } // [!code change] Pass setter
-                    name={ playerName } // [!code change] Pass value
+                    onNameChange={ setPlayerName }
+                    name={ playerName }
                 />
             ) }
 
             <Canvas shadows dpr={ [1, 2] }>
                 <color attach='background' args={ [useThemeColor('--bg-page')] }/>
-                <PerspectiveCamera makeDefault position={ [0, 12, 16] } fov={ 40 } near={ 0.1 } far={ 200 }
-                                   onUpdate={ (c) => c.lookAt(0, 0, 0) }/>
+                <PerspectiveCamera
+                    makeDefault
+                    position={ [0, 12, 16] }
+                    fov={ 40 }
+                    near={ 0.1 }
+                    far={ 200 }
+                    onUpdate={ (c) => c.lookAt(0, 0, 0) }
+                />
                 <ambientLight intensity={ 0.4 }/>
                 <hemisphereLight intensity={ 0.3 } groundColor='#444'/>
-                <directionalLight position={ [10, 20, 10] } intensity={ 1.2 } castShadow shadow-mapSize={ [1024, 1024] }
-                                  shadow-bias={ -0.0001 }>
+                <directionalLight
+                    position={ [10, 20, 10] }
+                    intensity={ 1.2 }
+                    castShadow
+                    shadow-mapSize={ [1024, 1024] }
+                    shadow-bias={ -0.0001 }
+                >
                     <orthographicCamera attach='shadow-camera' args={ [-20, 20, 20, -20] }/>
                 </directionalLight>
                 <pointLight position={ [-10, 5, -5] } intensity={ 0.5 } color='#ccccff'/>
@@ -689,12 +764,13 @@ export default function Game() {
                     addAlert={ addAlert }
                     bjState={ bjState }
                     setPing={ setPing }
-                    playerName={ playerName } // [!code change] Pass Name
+                    playerName={ playerName }
                 />
 
-                { currentScene === 'bar' ?
-                    <BarLevel isDoorOpen={ isDoorOpen } playerRef={ playerRef } dealerHand={ bjState.dealerHand }/> :
-                    <AlleyLevel isDoorOpen={ isDoorOpen }/> }
+                { currentScene === 'bar'
+                    ? <BarLevel isDoorOpen={ isDoorOpen } dealerHand={ bjState.dealerHand }/>
+                    : <AlleyLevel isDoorOpen={ isDoorOpen }/>
+                }
 
                 <Player
                     key={ currentScene }
@@ -712,7 +788,7 @@ export default function Game() {
                     onSeatInteract={ handleSeatInteract }
                     peerId={ peerId || 'Local' }
                     seatData={ isSeated ? { seatIndex: mySeatIndex, hand: bjState.seats[mySeatIndex].hand } : null }
-                    name={ playerName } // [!code change] Pass Name to Local Player
+                    name={ playerName }
                 />
 
                 { Object.entries(remotePlayers).map(([id, data]) => {

@@ -20,7 +20,12 @@ export type PlayerPose = 'idle' | 'sit';
 /* BLACKJACK TYPES                                                            */
 /* -------------------------------------------------------------------------- */
 
-export type Card = { suit: '♠' | '♥' | '♣' | '♦'; rank: string; value: number; isHidden?: boolean };
+export type Card = {
+    suit: '♠' | '♥' | '♣' | '♦';
+    rank: string;
+    value: number;
+    isHidden?: boolean;
+};
 
 export type BJSeatState = {
     peerId: string | null;
@@ -41,9 +46,10 @@ export type BJGameState = {
 /* WORLD & INTERACTION TYPES                                                  */
 /* -------------------------------------------------------------------------- */
 
+// Represents an Axis-Aligned Bounding Box (AABB) for collision
 export type Barrier = {
-    x: [number, number];
-    z: [number, number];
+    readonly x: readonly [number, number];
+    readonly z: readonly [number, number];
 };
 
 export type PortalDef = {
@@ -83,6 +89,12 @@ export type Interactable = {
     behavior: InteractionBehavior;
 };
 
+export type SceneConfig = {
+    barriers: Barrier[];
+    portals: PortalDef[];
+    interactables?: Interactable[];
+};
+
 /* -------------------------------------------------------------------------- */
 /* NETWORKING TYPES                                                           */
 /* -------------------------------------------------------------------------- */
@@ -99,33 +111,65 @@ export type RemotePlayerState = {
 };
 
 /* -------------------------------------------------------------------------- */
+/* UTILITIES                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Creates a collision barrier from a center point and dimensions.
+ * @param x - Center X coordinate
+ * @param z - Center Z coordinate
+ * @param width - Total width (X axis size)
+ * @param depth - Total depth (Z axis size)
+ */
+const createBarrier = (x: number, z: number, width: number, depth: number): Barrier => {
+    const halfW = width / 2;
+    const halfD = depth / 2;
+    return {
+        x: [x - halfW, x + halfW],
+        z: [z - halfD, z + halfD]
+    };
+};
+
+/* -------------------------------------------------------------------------- */
 /* SCENE DATA CONFIGURATION                                                   */
 /* -------------------------------------------------------------------------- */
 
-export const SCENE_DATA: Record<SceneType, {
-    barriers: Barrier[],
-    portals: PortalDef[],
-    interactables?: Interactable[]
-}> = {
+export const SCENE_DATA: Record<SceneType, SceneConfig> = {
     bar: {
         barriers: [
-            { x: [-50, 5.2], z: [-5, -3.5] },
-            { x: [6.8, 50], z: [-5, -3.5] },
-            { x: [-7.5, -0.5], z: [-2, -1.2] },
-            { x: [-8, -6.5], z: [-4, -1.5] },
-            { x: [-1.5, -0.5], z: [-2.75, -1.5] },
-            // Table
-            { x: [0.0, 6.0], z: [1.0, 4.2] },
-            // Barriers for Blackjack Chairs
-            { x: [-1.1, -0.5], z: [2.2, 2.8] },
-            { x: [0.7, 1.3], z: [4.0, 4.6] },
-            { x: [2.7, 3.3], z: [4.0, 4.6] },
-            { x: [4.7, 5.3], z: [4.0, 4.6] },
-            { x: [6.5, 7.1], z: [2.2, 2.8] },
-            // Barriers for Bar Stools
-            { x: [-6.3, -5.7], z: [-0.9, -0.3] },
-            { x: [-4.3, -3.7], z: [-0.9, -0.3] },
-            { x: [-2.3, -1.7], z: [-0.9, -0.3] }
+            // -- Architecture --
+            // Far Left Wall (Back)
+            createBarrier(-22.4, -4.25, 55.2, 1.5),
+            // Far Right Wall (Back)
+            createBarrier(28.4, -4.25, 43.2, 1.5),
+            // Bar Counter Main
+            createBarrier(-4.0, -1.6, 7.0, 0.8),
+            // Bar Side Nook
+            createBarrier(-7.25, -2.75, 1.5, 2.5),
+            // Bar Entrance Pillar/Divider
+            createBarrier(-1.0, -2.125, 1.0, 1.25),
+
+            // -- Furniture: Blackjack Table --
+            // Main Table Area
+            createBarrier(3.0, 2.6, 6.0, 3.2),
+            // Chair 1 (Left)
+            createBarrier(-1.2, 2.5, 0.6, 0.6),
+            // Chair 2 (Bottom-Left)
+            createBarrier(1.0, 4.3, 0.6, 1),
+            // Chair 3 (Bottom-Center)
+            createBarrier(3.0, 4.3, 0.6, 1),
+            // Chair 4 (Bottom-Right)
+            createBarrier(5.0, 4.3, 0.6, 1),
+            // Chair 5 (Right)
+            createBarrier(7.1, 2.5, 0.6, 0.6),
+
+            // -- Furniture: Bar Stools --
+            // Stool 1
+            createBarrier(-6.0, -0.6, 0.6, 0.6),
+            // Stool 2
+            createBarrier(-4.0, -0.6, 0.6, 0.6),
+            // Stool 3
+            createBarrier(-2.0, -0.6, 0.6, 0.6),
         ],
         portals: [{
             position: [6, 0, -3.9],
@@ -136,7 +180,7 @@ export const SCENE_DATA: Record<SceneType, {
         interactables: [
             {
                 id: 'bj-seat-0',
-                label: 'Seat 1',  // left side of table
+                label: 'Seat 1',
                 position: [-1.0, 0, 2.5],
                 interactionRadius: 1.4,
                 behavior: {
@@ -192,7 +236,7 @@ export const SCENE_DATA: Record<SceneType, {
             },
             {
                 id: 'bj-seat-4',
-                label: 'Seat 5',  // right side of table
+                label: 'Seat 5',
                 position: [7.0, 0, 2.5],
                 interactionRadius: 1.4,
                 behavior: {
@@ -250,10 +294,14 @@ export const SCENE_DATA: Record<SceneType, {
     },
     alley: {
         barriers: [
-            { x: [-50, 5.2], z: [-5, -3.5] },
-            { x: [6.8, 50], z: [-5, -3.5] },
-            { x: [-6.5, -3.5], z: [-3, -1] },
-            { x: [0.25, 2.75], z: [-4.0, -3.2] }
+            // Left Wall (Extension of Bar wall)
+            createBarrier(-22.4, -4.25, 55.2, 1.5),
+            // Right Wall (Extension of Bar wall)
+            createBarrier(28.4, -4.25, 43.2, 1.5),
+            // Dumpster / Obstacle Left
+            createBarrier(-5.0, -2.0, 3.0, 2.0),
+            // Bench / Obstacle Right
+            createBarrier(1.5, -3.6, 2.5, 0.8),
         ],
         portals: [{
             position: [6, 0, -3.9],
@@ -269,7 +317,7 @@ export const SCENE_DATA: Record<SceneType, {
                 interactionRadius: 1.8,
                 behavior: {
                     type: 'station',
-                    anchorPosition: [2.0, 0.35, -3.3],
+                    anchorPosition: [2.5, 0.35, -3.3],
                     anchorRotation: 0,
                     exitPosition: [2.0, 0, -2.5],
                     pose: 'sit',

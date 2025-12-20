@@ -1,229 +1,142 @@
 @import 'tailwindcss';
 
 @theme {
+    /* Layout */
     --color-page: var(--bg-page);
     --color-surface: var(--bg-surface);
     --color-surface-highlight: var(--bg-surface-highlight);
 
+    /* Text & Borders */
     --color-text-main: var(--text-main);
     --color-text-muted: var(--text-muted);
-
     --color-border-base: var(--border-base);
 
+    /* Brand */
     --color-primary: var(--brand-primary);
     --color-primary-fg: var(--brand-primary-fg);
 
-    /* Widget: Synth */
-    --color-key-white-bg: var(--key-white-bg);
-    --color-key-white-active: var(--key-white-active);
-    --color-key-white-border: var(--key-white-border);
-
-    --color-key-black-bg: var(--key-black-bg);
-    --color-key-black-active: var(--key-black-active);
-    --color-key-black-border: var(--key-black-border);
+    /* Game State Colors */
+    --color-game-danger: var(--game-danger);
+    --color-game-success: var(--game-success);
+    --color-game-accent: var(--game-accent);
 }
 
 /* -------------------------------------------------------------------------- */
-/* BASE THEME (LIGHT)                                                         */
+/* THEME DEFINITIONS                                                          */
 /* -------------------------------------------------------------------------- */
 
 :root {
-    /* Layout Colors */
-    --bg-page: #fffbf4;
+    /* --- LIGHT THEME (Warmer, Cozy Bar) --- */
+    --bg-page: #fdfaf3;
     --bg-surface: #ffffff;
-    --bg-surface-highlight: #f4f4f5;
-
-    /* Typography */
+    --bg-surface-highlight: #f8f8f2;
     --text-main: #18181b;
-    --text-muted: #52525b;
-
-    /* Borders */
+    --text-muted: #71717a;
     --border-base: #e4e4e7;
-
-    /* Brand Identity */
     --brand-primary: #18181b;
     --brand-primary-fg: #ffffff;
 
-    /* Component: Synth Widget */
-    --key-white-bg: #FFFFF0;
-    --key-white-active: #F0F0E0;
-    --key-white-border: #000000;
-    --key-black-bg: #27272a;
-    --key-black-active: #3f3f46;
-    --key-black-border: #000000;
+    /* Game Assets: Environment */
+    --game-wood: #a16207; /* Golden Oak */
+    --game-metal: #71717a; /* Steel */
+    --game-grass: #65a30d;
+    --game-sky: #7dd3fc;
+    --game-accent: #f59e0b;
+    --game-danger: #ef4444;
+    --game-success: #22c55e;
 
-    /* Component: Game Assets */
-    --game-wood: #8b5a2b;
-    --game-metal: #1a1a1a;
-    --game-shirt-smoker: #34495e;
-    --game-pants: #222222;
-
-    /* Component: Player Model */
-    --player-torso: #2563eb; /* Bright Blue */
-    --player-legs: #1e293b; /* Slate 800 */
-    --player-head: #fbbf24; /* Amber 400 */
+    /* Player Details */
+    --player-torso: #2563eb;
+    --player-legs: #1e293b;
+    --player-head: #fdba74; /* Warm Skin Tone */
+    --game-shirt-smoker: #475569;
+    --game-pants: #0f172a;
 }
-
-/* -------------------------------------------------------------------------- */
-/* DARK THEME                                                                 */
-/* -------------------------------------------------------------------------- */
 
 :root[data-theme='dark'] {
-    /* Layout Colors */
-    --bg-page: #09090b;
+    /* --- DARK THEME (Late Night Lounge) --- */
+    --bg-page: #0c0c0e;
     --bg-surface: #18181b;
     --bg-surface-highlight: #27272a;
-
-    /* Typography */
-    --text-main: #f4f4f5;
+    --text-main: #fafafa;
     --text-muted: #a1a1aa;
-
-    /* Borders */
-    --border-base: #27272a;
-
-    /* Brand Identity */
-    --brand-primary: #f4f4f5;
+    --border-base: #3f3f46;
+    --brand-primary: #ffffff;
     --brand-primary-fg: #09090b;
 
-    /* Component: Synth Widget */
-    --key-white-bg: #27272a;
-    --key-white-active: #18181b;
-    --key-white-border: #52525b;
-    --key-black-bg: #000000;
-    --key-black-active: #18181b;
-    --key-black-border: #52525b;
+    /* Game Assets: Environment */
+    --game-wood: #452e13; /* Dark Walnut */
+    --game-metal: #27272a; /* Iron */
+    --game-grass: #365314;
+    --game-sky: #0c4a6e;
+    --game-accent: #fbbf24;
 
-    /* Component: Game Assets */
-    --game-wood: #5d4037;
-    --game-metal: #000000;
-    --game-shirt-smoker: #4a6fa5;
-    --game-pants: #111111;
-
-    /* Component: Player Model */
-    --player-torso: #60a5fa; /* Blue 400 */
-    --player-legs: #0f172a; /* Slate 900 */
-    --player-head: #facc15; /* Yellow 400 */
+    /* Player Details */
+    --player-torso: #3b82f6;
+    --player-legs: #0f172a;
+    --player-head: #ffedd5;
 }
-
-/* -------------------------------------------------------------------------- */
-/* HIGH CONTRAST THEME                                                        */
-/* -------------------------------------------------------------------------- */
-
-:root[data-theme='contrast'] {
-    /* Layout Colors */
-    --bg-page: #000000;
-    --bg-surface: #000000;
-    --bg-surface-highlight: #1a1a1a;
-
-    /* Typography */
-    --text-main: #ffffff;
-    --text-muted: #ffffff;
-
-    /* Borders */
-    --border-base: #ffffff;
-
-    /* Brand Identity */
-    --brand-primary: #00ffff;
-    --brand-primary-fg: #000000;
-
-    /* Component: Synth Widget */
-    --key-white-bg: #000000;
-    --key-white-active: #1a1a1a;
-    --key-white-border: #ffffff;
-    --key-black-bg: #22d3ee;
-    --key-black-active: #ffffff;
-    --key-black-border: #ffffff;
-
-    /* Component: Game Assets */
-    --game-wood: #fc4233;
-    --game-metal: #ffffff;
-    --game-shirt-smoker: #363232;
-    --game-pants: #1a1a1a;
-
-    /* Component: Player Model */
-    --player-torso: #ff00ff; /* Magenta */
-    --player-legs: #ffffff; /* White */
-    --player-head: #ffff00; /* Yellow */
-}
-
-/* -------------------------------------------------------------------------- */
-/* TERMINAL THEME                                                             */
-/* -------------------------------------------------------------------------- */
 
 :root[data-theme='terminal'] {
-    /* Layout Colors */
-    --bg-page: #000000;
-    --bg-surface: #0c0c0c;
-    --bg-surface-highlight: #001a00;
-
-    /* Typography */
+    /* --- TERMINAL THEME (Retro Phosphor) --- */
+    --bg-page: #020802;
+    --bg-surface: #051105;
+    --bg-surface-highlight: #0a220a;
     --text-main: #4ade80;
-    --text-muted: #166534;
-
-    /* Borders */
+    --text-muted: #14532d;
     --border-base: #22c55e;
-
-    /* Brand Identity */
     --brand-primary: #4ade80;
-    --brand-primary-fg: #000000;
+    --brand-primary-fg: #020802;
 
-    /* Component: Synth Widget */
-    --key-white-bg: #000000;
-    --key-white-active: #003300;
-    --key-white-border: #4ade80;
-    --key-black-bg: #15803d;
-    --key-black-active: #4ade80;
-    --key-black-border: #22c55e;
-
-    /* Component: Game Assets */
-    --game-wood: #14532d;
-    --game-metal: #000000;
-    --game-shirt-smoker: #22c55e;
-    --game-pants: #052e16;
-
-    /* Component: Player Model */
-    --player-torso: #22c55e; /* Green 500 */
-    --player-legs: #14532d; /* Green 900 */
-    --player-head: #86efac; /* Green 300 */
+    /* Game Assets: High Contrast Matrix */
+    --game-wood: #064e3b;
+    --game-metal: #022c22;
+    --game-grass: #166534;
+    --game-sky: #052e16;
+    --game-accent: #86efac;
 }
 
-/* -------------------------------------------------------------------------- */
-/* CATPPUCCIN THEME                                                           */
-/* -------------------------------------------------------------------------- */
-
 :root[data-theme='catppuccin'] {
-    /* Layout Colors */
+    /* --- CATPPUCCIN THEME (Mocha) --- */
     --bg-page: #1e1e2e;
     --bg-surface: #181825;
     --bg-surface-highlight: #313244;
-
-    /* Typography */
     --text-main: #cdd6f4;
-    --text-muted: #a6adc8;
-
-    /* Borders */
+    --text-muted: #7f849c;
     --border-base: #45475a;
-
-    /* Brand Identity */
     --brand-primary: #cba6f7;
-    --brand-primary-fg: #1e1e2e;
+    --brand-primary-fg: #11111b;
 
-    /* Component: Synth Widget */
-    --key-white-bg: #cdd6f4;
-    --key-white-active: #b4befe;
-    --key-white-border: #45475a;
-    --key-black-bg: #11111b;
-    --key-black-active: #1e1e2e;
-    --key-black-border: #45475a;
+    /* Game Assets: Pastel Dreams */
+    --game-wood: #fab387; /* Peach Wood */
+    --game-metal: #585b70;
+    --game-grass: #a6e3a1;
+    --game-sky: #89dceb;
+    --game-accent: #f9e2af;
+    --game-danger: #f38ba8;
+    --game-success: #94e2d5;
 
-    /* Component: Game Assets */
-    --game-wood: #fab387;
-    --game-metal: #11111b;
-    --game-shirt-smoker: #89b4fa;
-    --game-pants: #181825;
+    /* Player Details */
+    --player-torso: #89b4fa;
+    --player-legs: #313244;
+    --player-head: #f5e0dc; /* Rosewater Skin */
+}
 
-    /* Component: Player Model */
-    --player-torso: #f38ba8; /* Red/Pink */
-    --player-legs: #11111b; /* Crust */
-    --player-head: #f9e2af; /* Yellow */
+:root[data-theme='contrast'] {
+    /* --- HIGH CONTRAST (Accessibility/Hyper) --- */
+    --bg-page: #000000;
+    --bg-surface: #000000;
+    --bg-surface-highlight: #1a1a1a;
+    --text-main: #ffffff;
+    --text-muted: #ffffff;
+    --border-base: #ffffff;
+    --brand-primary: #00ffff;
+    --brand-primary-fg: #000000;
+
+    /* Game Assets: Primary Vectors */
+    --game-wood: #ff00ff;
+    --game-metal: #ffffff;
+    --game-grass: #00ff00;
+    --game-sky: #0000ff;
+    --game-accent: #ffff00;
 }

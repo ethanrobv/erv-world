@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, type ReactNode } from 'react';
+import { useEffect, useState, useRef, useMemo, type ReactNode } from 'react';
 import { Peer } from 'peerjs';
 import { NetworkContext } from '../context/NetworkContext';
 
@@ -15,11 +15,14 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     /* -------------------------------------------------------------------------- */
 
     useEffect(() => {
+        // Initialize PeerJS
         const peer = new Peer();
 
         peer.on('open', (id) => {
-            setPeerId(id);
             console.log('My peer ID is: ' + id);
+            // This state update will trigger a re-render,
+            // allowing the context to expose the now-ready peerRef.current
+            setPeerId(id);
         });
 
         peer.on('error', (err) => {
@@ -30,6 +33,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 
         return () => {
             peer.destroy();
+            peerRef.current = null;
         };
     }, []);
 
@@ -37,8 +41,14 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     /* PROVIDER RENDER                                                            */
     /* -------------------------------------------------------------------------- */
 
+    // Memoize the value to prevent unnecessary re-renders in consumers
+    const contextValue = useMemo(() => ({
+        peer: peerRef.current,
+        peerId
+    }), [peerId]);
+
     return (
-        <NetworkContext.Provider value={ { peer: peerRef.current, peerId } }>
+        <NetworkContext.Provider value={ contextValue }>
             { children }
         </NetworkContext.Provider>
     );

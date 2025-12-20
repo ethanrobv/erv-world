@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { WidgetContext, type WidgetType } from '../context/WidgetContext';
 
 export function WidgetProvider({ children }: { children: ReactNode }) {
@@ -35,6 +35,7 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     const bringToFront = (widget: WidgetType) => {
         setActiveWidgets((prev) => {
             if (!prev.includes(widget)) return prev;
+            // Filter out, then append to end (highest z-index effectively)
             const others = prev.filter((w) => w !== widget);
             return [...others, widget];
         });
@@ -50,15 +51,18 @@ export function WidgetProvider({ children }: { children: ReactNode }) {
     /* PROVIDER RENDER                                                            */
     /* -------------------------------------------------------------------------- */
 
+    // Memoize value to prevent unnecessary re-renders in consumers
+    const contextValue = useMemo(() => ({
+        activeWidgets,
+        bringToFront,
+        openWidget,
+        closeWidget,
+        toggleWidget,
+        isWidgetOpen
+    }), [activeWidgets]);
+
     return (
-        <WidgetContext.Provider value={ {
-            activeWidgets,
-            bringToFront,
-            openWidget,
-            closeWidget,
-            toggleWidget,
-            isWidgetOpen
-        } }>
+        <WidgetContext.Provider value={ contextValue }>
             { children }
         </WidgetContext.Provider>
     );
