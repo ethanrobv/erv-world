@@ -108,6 +108,7 @@ export type RemotePlayerState = {
     isFading?: boolean;
     lastSeen?: number;
     name?: string;
+    meta?: Record<string, any>;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -137,21 +138,21 @@ const createBarrier = (x: number, z: number, width: number, depth: number): Barr
 export const SCENE_DATA: Record<SceneType, SceneConfig> = {
     bar: {
         barriers: [
-            // -- Architecture --
+            // Architecture
             // Far Left Wall (Back)
             createBarrier(-22.4, -4.25, 55.2, 1.5),
             // Far Right Wall (Back)
             createBarrier(28.4, -4.25, 43.2, 1.5),
             // Bar Counter Main
-            createBarrier(-4.0, -1.6, 7.0, 0.8),
+            createBarrier(-4.0, -1.6, 7.0, 0.9),
             // Bar Side Nook
-            createBarrier(-7.25, -2.75, 1.5, 2.5),
+            createBarrier(-6.8, -2.75, 1.5, 2.5),
             // Bar Entrance Pillar/Divider
-            createBarrier(-1.0, -2.125, 1.0, 1.25),
+            createBarrier(-1.3, -2.3, 1.35, 1.3),
 
-            // -- Furniture: Blackjack Table --
+            // Furniture: Blackjack Table
             // Main Table Area
-            createBarrier(3.0, 2.6, 6.0, 3.2),
+            createBarrier(2.9, 2.4, 6.6, 3.2),
             // Chair 1 (Left)
             createBarrier(-1.2, 2.5, 0.6, 0.6),
             // Chair 2 (Bottom-Left)
@@ -163,18 +164,18 @@ export const SCENE_DATA: Record<SceneType, SceneConfig> = {
             // Chair 5 (Right)
             createBarrier(7.1, 2.5, 0.6, 0.6),
 
-            // -- Furniture: Bar Stools --
-            // Stool 1
+            // Furniture: Bar Stools
+            // Left
             createBarrier(-6.0, -0.6, 0.6, 0.6),
-            // Stool 2
+            // Center
             createBarrier(-4.0, -0.6, 0.6, 0.6),
-            // Stool 3
+            // Right
             createBarrier(-2.0, -0.6, 0.6, 0.6),
         ],
         portals: [{
             position: [6, 0, -3.9],
             targetScene: 'alley',
-            spawnPosition: [6, 0, -2.5],
+            spawnPosition: [6, 0, -7],
             spawnRotation: 0
         }],
         interactables: [
@@ -294,36 +295,43 @@ export const SCENE_DATA: Record<SceneType, SceneConfig> = {
     },
     alley: {
         barriers: [
-            // Left Wall (Extension of Bar wall)
-            createBarrier(-22.4, -4.25, 55.2, 1.5),
-            // Right Wall (Extension of Bar wall)
-            createBarrier(28.4, -4.25, 43.2, 1.5),
+            // Deep Back Wall
+            createBarrier(0, -10, 30, 1.0),
             // Dumpster / Obstacle Left
-            createBarrier(-5.0, -2.0, 3.0, 2.0),
+            createBarrier(-5.0, -8.0, 3, 2.0),
             // Bench / Obstacle Right
-            createBarrier(1.5, -3.6, 2.5, 0.8),
+            createBarrier(2, -9.5, 2.8, 1),
         ],
         portals: [{
-            position: [6, 0, -3.9],
+            position: [6, 0, -10],
             targetScene: 'bar',
-            spawnPosition: [6, 0, -2.5],
+            spawnPosition: [6, 0, -1],
             spawnRotation: 0
         }],
         interactables: [
             {
                 id: 'alley-bench',
                 label: 'Sit',
-                position: [2.0, 0, -3.6],
+                position: [2.0, 0, -9.6],
                 interactionRadius: 1.8,
                 behavior: {
                     type: 'station',
-                    anchorPosition: [2.5, 0.35, -3.3],
+                    anchorPosition: [2.5, 0.35, -8.6],
                     anchorRotation: 0,
-                    exitPosition: [2.0, 0, -2.5],
+                    exitPosition: [2.5, 0, -8.2],
                     pose: 'sit',
                     exitLabel: 'Stand Up'
                 }
-            }
+            },
+            {
+                id: 'trash-fire',
+                label: 'Toggle Fire',
+                position: [-5, 0, -2.5], // Vertically between dumpster (z=-8) and street (z=3.5)
+                interactionRadius: 1.5,
+                behavior: {
+                    type: 'trigger'
+                }
+            },
         ]
     }
 };

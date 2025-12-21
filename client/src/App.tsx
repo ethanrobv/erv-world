@@ -42,7 +42,7 @@ const getCenteredPos = (w: number, h: number) => {
  * Manages high-level routing and the rendering of global floating widgets.
  */
 export default function App() {
-    const { isWidgetOpen, closeWidget, activeWidgets, bringToFront } = useWidgets();
+    const { isWidgetOpen, openWidget, closeWidget, activeWidgets, bringToFront } = useWidgets();
 
     // Local state to force re-centering calculations if the window size changes
     const [, setWindowSize] = useState({ width: 0, height: 0 });
@@ -55,7 +55,16 @@ export default function App() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // -- Widget Configurations -----------------------------------------------
+    // From 'main menu' button of Game -> re-open
+    useEffect(() => {
+        const shouldReopen = sessionStorage.getItem('reopen_game');
+        if (shouldReopen === 'true') {
+            sessionStorage.removeItem('reopen_game');
+            openWidget('game');
+        }
+    }, [openWidget])
+
+    // Widget Configurations
     const SYNTH_SIZE = { width: 1000, height: 400 };
     const GAME_SIZE = { width: 900, height: 750 };
 
@@ -82,10 +91,9 @@ export default function App() {
                 </Routes>
             </main>
 
-            {/* Widget Overlays */ }
-            {/* Widgets are rendered at the root level to avoid clipping
-          and to maintain a consistent z-index context.
-      */ }
+            {/* Widget Overlays
+                Widgets are rendered at the root level to avoid clipping and maintain a consistent z-index context
+            */ }
 
             { isWidgetOpen('synth') && (
                 <FloatingWindow

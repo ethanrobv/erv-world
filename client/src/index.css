@@ -19,6 +19,14 @@
     --color-game-danger: var(--game-danger);
     --color-game-success: var(--game-success);
     --color-game-accent: var(--game-accent);
+
+    /* Synth Keys */
+    --color-key-white-bg: var(--key-white-bg);
+    --color-key-white-border: var(--key-white-border);
+    --color-key-white-active: var(--key-white-active);
+    --color-key-black-bg: var(--key-black-bg);
+    --color-key-black-border: var(--key-black-border);
+    --color-key-black-active: var(--key-black-active);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -36,6 +44,14 @@
     --brand-primary: #18181b;
     --brand-primary-fg: #ffffff;
 
+    /* Synth Keys (Light) */
+    --key-white-bg: #ffffff;
+    --key-white-border: #e4e4e7;
+    --key-white-active: #f4f4f5;
+    --key-black-bg: #18181b;
+    --key-black-border: #000000;
+    --key-black-active: #3f3f46;
+
     /* Game Assets: Environment */
     --game-wood: #a16207; /* Golden Oak */
     --game-metal: #71717a; /* Steel */
@@ -44,6 +60,14 @@
     --game-accent: #f59e0b;
     --game-danger: #ef4444;
     --game-success: #22c55e;
+
+    /* Lighting */
+    --game-light-warm: #ffaa00; /* Richer Amber */
+    --game-light-cool: #e0f2fe;
+    --game-neon-main: #db2777;
+    --game-neon-alt: #2563eb;
+    --game-sun-color: #fff7ed; /* Warm Daylight */
+    --game-window-glass: #dbeafe; /* Bright Day Glass */
 
     /* Player Details */
     --player-torso: #2563eb;
@@ -64,12 +88,28 @@
     --brand-primary: #ffffff;
     --brand-primary-fg: #09090b;
 
+    /* Synth Keys (Dark) */
+    --key-white-bg: #27272a;
+    --key-white-border: #3f3f46;
+    --key-white-active: #3f3f46;
+    --key-black-bg: #09090b;
+    --key-black-border: #000000;
+    --key-black-active: #18181b;
+
     /* Game Assets: Environment */
     --game-wood: #452e13; /* Dark Walnut */
     --game-metal: #27272a; /* Iron */
     --game-grass: #365314;
     --game-sky: #0c4a6e;
     --game-accent: #fbbf24;
+
+    /* Lighting */
+    --game-light-warm: #f59e0b;
+    --game-light-cool: #0ea5e9;
+    --game-neon-main: #d946ef;
+    --game-neon-alt: #3b82f6;
+    --game-sun-color: #000000; /* Sun is OFF at night */
+    --game-window-glass: #0f172a; /* Dark Night Glass */
 
     /* Player Details */
     --player-torso: #3b82f6;
@@ -88,12 +128,28 @@
     --brand-primary: #4ade80;
     --brand-primary-fg: #020802;
 
-    /* Game Assets: High Contrast Matrix */
+    /* Synth Keys (Terminal) */
+    --key-white-bg: #051105;
+    --key-white-border: #22c55e;
+    --key-white-active: #0a220a;
+    --key-black-bg: #020802;
+    --key-black-border: #14532d;
+    --key-black-active: #14532d;
+
+    /* Game Assets */
     --game-wood: #064e3b;
     --game-metal: #022c22;
     --game-grass: #166534;
     --game-sky: #052e16;
     --game-accent: #86efac;
+
+    /* Lighting */
+    --game-light-warm: #4ade80;
+    --game-light-cool: #15803d;
+    --game-neon-main: #86efac;
+    --game-neon-alt: #22c55e;
+    --game-sun-color: #000000;
+    --game-window-glass: #000000;
 }
 
 :root[data-theme='catppuccin'] {
@@ -107,8 +163,16 @@
     --brand-primary: #cba6f7;
     --brand-primary-fg: #11111b;
 
-    /* Game Assets: Pastel Dreams */
-    --game-wood: #fab387; /* Peach Wood */
+    /* Synth Keys (Catppuccin) */
+    --key-white-bg: #313244;
+    --key-white-border: #45475a;
+    --key-white-active: #45475a;
+    --key-black-bg: #11111b;
+    --key-black-border: #181825;
+    --key-black-active: #1e1e2e;
+
+    /* Game Assets */
+    --game-wood: #fab387;
     --game-metal: #585b70;
     --game-grass: #a6e3a1;
     --game-sky: #89dceb;
@@ -116,10 +180,18 @@
     --game-danger: #f38ba8;
     --game-success: #94e2d5;
 
+    /* Lighting */
+    --game-light-warm: #f9e2af;
+    --game-light-cool: #89b4fa;
+    --game-neon-main: #cba6f7;
+    --game-neon-alt: #f5c2e7;
+    --game-sun-color: #000000;
+    --game-window-glass: #11111b;
+
     /* Player Details */
     --player-torso: #89b4fa;
     --player-legs: #313244;
-    --player-head: #f5e0dc; /* Rosewater Skin */
+    --player-head: #f5e0dc;
 }
 
 :root[data-theme='contrast'] {
@@ -133,10 +205,26 @@
     --brand-primary: #00ffff;
     --brand-primary-fg: #000000;
 
-    /* Game Assets: Primary Vectors */
+    /* Synth Keys (Contrast) */
+    --key-white-bg: #000000;
+    --key-white-border: #ffffff;
+    --key-white-active: #333333;
+    --key-black-bg: #000000;
+    --key-black-border: #ffff00;
+    --key-black-active: #ffffff;
+
+    /* Game Assets */
     --game-wood: #ff00ff;
     --game-metal: #ffffff;
     --game-grass: #00ff00;
     --game-sky: #0000ff;
     --game-accent: #ffff00;
+
+    /* Lighting */
+    --game-light-warm: #ffff00;
+    --game-light-cool: #0000ff;
+    --game-neon-main: #ff00ff;
+    --game-neon-alt: #00ffff;
+    --game-sun-color: #ffffff;
+    --game-window-glass: #ffffff;
 }

@@ -8,16 +8,10 @@ import { useWorkerInterval } from './useWorkerInterval';
 
 /* -------------------------------------------------------------------------- */
 
-/**
- * Extended Error interface to handle specific PeerJS error codes.
- */
 interface PeerError extends Error {
     type: string;
 }
 
-/**
- * Return type for the useGameP2P hook.
- */
 interface GameP2PHook {
     peerId: string | null;
     isHost: boolean;
@@ -33,13 +27,6 @@ interface GameP2PHook {
 /* HOOK DEFINITION                                                            */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Manages PeerJS connections, room state, and host migration logic for P2P gaming.
- *
- * @param onPeerJoined - Callback when a new peer connects (Host only).
- * @param onPeerLeft - Callback when a peer disconnects.
- * @param heirId - The ID of the peer designated to take over if the host disconnects.
- */
 export const useGameP2P = (
     onPeerJoined?: (id: string) => void,
     onPeerLeft?: (id: string) => void,
@@ -57,6 +44,10 @@ export const useGameP2P = (
     // -- Refs (Mutable state for logic outside render cycle) ------------------
     const roomCodeRef = useRef<string | null>(null);
     const heirIdRef = useRef<string | null>(null);
+
+    // Track connections for unmount cleanup
+    const connectionsRef = useRef(connections);
+    const hostConnRef = useRef(hostConn);
 
     // Watchdog Timers
     const hostLastSeenRef = useRef<number>(Date.now());
@@ -76,14 +67,58 @@ export const useGameP2P = (
         heirIdRef.current = heirId || null;
     }, [heirId]);
 
+    // Keep connection refs in sync for cleanup
+    useEffect(() => {
+        connectionsRef.current = connections;
+    }, [connections]);
+
+    useEffect(() => {
+        hostConnRef.current = hostConn;
+    }, [hostConn]);
+
+    /* -------------------------------------------------------------------------- */
+    /* UNMOUNT / CLOSE CLEANUP                                                    */
+    /* -------------------------------------------------------------------------- */
+
+    useEffect(() => {
+        const terminateSession = () => {
+            // Check if there is actually anything to clean up.
+            // This prevents logs/logic from running during React Strict Mode's
+            // immediate mount/unmount cycle when opening the widget.
+            const hasActiveHost = hostConnRef.current && hostConnRef.current.open;
+            const hasActiveClients = connectionsRef.current.some(c => c.open);
+
+            if (!hasActiveHost && !hasActiveClients) return;
+
+            console.log('[P2P] Game Widget/Window closing. Terminating session...');
+
+            // 1. If we are a Guest, disconnect from the Host.
+            if (hostConnRef.current && hostConnRef.current.open) {
+                hostConnRef.current.close();
+            }
+
+            // 2. If we are the Host, close connections to all Clients.
+            connectionsRef.current.forEach((conn) => {
+                if (conn.open) {
+                    conn.close();
+                }
+            });
+        };
+
+        // Handle Browser Tab Close
+        window.addEventListener('beforeunload', terminateSession);
+
+        // Handle React Component Unmount (Widget Close)
+        return () => {
+            window.removeEventListener('beforeunload', terminateSession);
+            terminateSession();
+        };
+    }, []);
+
     /* -------------------------------------------------------------------------- */
     /* SERVER HEARTBEAT                                                           */
     /* -------------------------------------------------------------------------- */
 
-    /**
-     * Periodically informs the game server that this host is still active.
-     * Prevents the room from being marked as stale.
-     */
     useEffect(() => {
         if (!isHost || !roomCode || !peerId) return;
 
@@ -93,8 +128,7 @@ export const useGameP2P = (
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomCode, peerId })
             }).catch(() => {
-                // Heartbeat failure is silent to avoid UI spam;
-                // The server will handle the timeout naturally.
+                // Heartbeat failure is silent
             });
         }, 5000);
 
@@ -137,19 +171,15 @@ export const useGameP2P = (
     /* WORKER-POWERED WATCHDOG                                                    */
     /* -------------------------------------------------------------------------- */
 
-    /**
-     * Monitors the connection to the host using a Web Worker.
-     * This ensures checks run accurately even if the main thread is blocked (e.g., during heavy rendering).
-     */
     useWorkerInterval(() => {
         if (!hostConn || !hostConn.open) return;
 
         const now = Date.now();
 
-        // 1. IMMUTABLE GRACE PERIOD (5s) - Allow time for initial handshake
+        // 1. IMMUTABLE GRACE PERIOD (5s)
         if (now < connectionStartRef.current + 5000) return;
 
-        // 2. STRICT TIMEOUT (2s) - If no data received, assume host is dead
+        // 2. STRICT TIMEOUT (2s)
         if (now - hostLastSeenRef.current > 2000) {
             console.warn('[WATCHDOG] Host silent > 2s. Disconnecting.');
             hostConn.close();
@@ -165,9 +195,7 @@ export const useGameP2P = (
             hostLastSeenRef.current = Date.now();
         };
 
-        // Reset timer on every data packet received
         conn.on('data', onData);
-
         setWatchdogActive(true);
 
         conn.on('close', () => {
@@ -182,9 +210,8 @@ export const useGameP2P = (
 
     const connectToHost = useCallback((targetPeerId: string, targetRoomCode: string, retryCount = 0) => {
         if (!peer || !peerId) return;
-        if (targetPeerId === peerId) return; // Prevent self-connection
+        if (targetPeerId === peerId) return;
 
-        // Prevent duplicate connection attempts
         if (hostConn && hostConn.peer === targetPeerId && hostConn.open) return;
         if (isConnectingRef.current && retryCount === 0) return;
 
@@ -212,17 +239,13 @@ export const useGameP2P = (
 
             const currentHeir = heirIdRef.current;
 
-            // -- MIGRATION LOGIC --
             if (currentHeir) {
                 if (currentHeir === peerId) {
-                    // 1. I am the Heir -> Become Host
                     console.log('[MIGRATION] I am Heir. Promoting.');
                     setIsHost(true);
                     void claimThrone(targetRoomCode);
                 } else {
-                    // 2. I am not the Heir -> Connect to the Heir
                     console.log(`[MIGRATION] Connecting to Heir: ${ currentHeir }`);
-                    // Add random jitter to prevent thundering herd on the new host
                     setTimeout(() => {
                         connectToHost(currentHeir, targetRoomCode);
                     }, 100 + Math.random() * 200);
@@ -230,7 +253,6 @@ export const useGameP2P = (
                 return;
             }
 
-            // -- FALLBACK LOGIC (Check API) --
             void getHostFromApi(targetRoomCode).then((serverHostId) => {
                 if (serverHostId && serverHostId !== targetPeerId) {
                     console.log(`[MIGRATION] Server points to: ${ serverHostId }`);
@@ -250,7 +272,6 @@ export const useGameP2P = (
         });
         conn.on('open', onOpen);
 
-        // Timeout: Abort if connection takes too long
         setTimeout(() => {
             if (!conn.open && !isHost && isConnectingRef.current && targetPeerIdRef.current === targetPeerId) {
                 console.warn('[P2P] Timeout. Aborting.');
@@ -272,10 +293,8 @@ export const useGameP2P = (
 
         const handleError = (err: unknown) => {
             console.error('[Peer] Error:', err);
-
             const peerError = err as PeerError;
 
-            // Handle connection loss/instability
             if (['peer-unavailable', 'socket-closed', 'network'].includes(peerError.type)) {
                 if (targetPeerIdRef.current && isConnectingRef.current) {
                     console.warn('[P2P] Target unavailable. Triggering migration.');
@@ -283,7 +302,6 @@ export const useGameP2P = (
                 }
             }
 
-            // Handle fatal ID errors
             if (['unavailable-id', 'invalid-id'].includes(peerError.type)) {
                 isConnectingRef.current = false;
                 setP2pError(`Network Error: ${ peerError.type }`);
@@ -303,8 +321,6 @@ export const useGameP2P = (
     /* GHOST RECOVERY                                                             */
     /* -------------------------------------------------------------------------- */
 
-    // Detects if we are "hosting" but have no peers, and an heir exists.
-    // This usually implies a split-brain scenario where we should have been a guest.
     useEffect(() => {
         if (!isHost || !heirId || heirId === peerId) return;
 
@@ -389,7 +405,6 @@ export const useGameP2P = (
         setP2pError(null);
 
         try {
-            // Ensure upper case for room codes
             const normalizedCode = code.toUpperCase();
             const res = await fetch(`/api/game/room/${ normalizedCode }`);
 

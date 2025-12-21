@@ -91,11 +91,15 @@ export default function Synth() {
                         return (
                             <div
                                 key={ `${ note }-${ i }` }
+                                // Z-Index Stack: Earlier keys (C) render ON TOP of later keys (D).
+                                // This ensures the black key attached to C sits above D's border.
+                                style={ { zIndex: DOUBLE_SCALE.length - i } }
                                 className={ `relative flex w-14 h-48 shrink-0 flex-col border-t ${ isFirst ? 'border-l' : '' } ${ isLast ? 'border-r' : '' }` }
                             >
                                 {/* White Key */ }
                                 <button
                                     onMouseDown={ () => handleNoteClick(i) }
+                                    // Use the new theme classes which now have opaque backgrounds
                                     className='h-full w-full rounded-b-sm transition-colors duration-200 cursor-pointer border bg-key-white-bg border-key-white-border active:bg-key-white-active hover:opacity-90'
                                 />
 
@@ -107,6 +111,7 @@ export default function Synth() {
                                             handleNoteClick(i + 1);
                                         } }
                                         style={ { width: '60%' } }
+                                        // Use the new theme classes (bg-key-black-bg is now solid)
                                         className='absolute left-full top-0 z-10 -translate-x-1/2 h-3/5 rounded-b-sm shadow-md transition-colors duration-200 cursor-pointer border bg-key-black-bg border-key-black-border active:bg-key-black-active'
                                     />
                                 ) }
