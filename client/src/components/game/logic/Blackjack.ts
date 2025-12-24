@@ -1,7 +1,9 @@
 import type { Card, BJGameState } from '../GameConfig';
 
 /**
- * Generates a 416 (8-deck) sequence of cards.
+ * Generates a standard shuffled Shoe (collection of decks).
+ * Defaults to 8 decks (416 cards) to simulate a standard casino shoe.
+ * Uses the Fisher-Yates shuffle algorithm.
  *
  * @returns A shuffled array of Card objects.
  */
@@ -17,6 +19,7 @@ export const generateDeck = (): Card[] => {
                 let val = parseInt(r);
                 if (r === 'A') val = 11;
                 else if (['J', 'Q', 'K'].includes(r)) val = 10;
+
                 deck.push({ suit: s, rank: r, value: val });
             }
         }
@@ -32,10 +35,11 @@ export const generateDeck = (): Card[] => {
 };
 
 /**
- * Calculates the numeric value of a hand, automatically adjusting Aces from 11 to 1 if needed.
+ * Calculates the best possible numeric value of a hand.
+ * Automatically adjusts Aces from 11 to 1 if the total exceeds 21.
  *
  * @param cards - The array of cards in the hand.
- * @returns The best possible Blackjack value for the hand.
+ * @returns The optimized Blackjack score.
  */
 export const calculateHand = (cards: Card[]): number => {
     let sum = 0;
@@ -47,6 +51,7 @@ export const calculateHand = (cards: Card[]): number => {
         sum += c.value;
     }
 
+    // Downgrade Aces if bust
     while (sum > 21 && aces > 0) {
         sum -= 10;
         aces--;
@@ -56,20 +61,20 @@ export const calculateHand = (cards: Card[]): number => {
 };
 
 /**
- * Creates the default empty state for a new game session.
+ * Creates the default empty state for a new Blackjack session.
+ * Initializes 5 empty seats and sets the phase to 'idle'.
  *
- * @returns The initial BJGameState with 5 empty seats.
+ * @returns The initial BJGameState.
  */
 export const createInitialState = (): BJGameState => ({
     phase: 'idle',
     dealerHand: [],
-    seats: [
-        { peerId: null, hand: [], bet: 0, status: 'empty' },
-        { peerId: null, hand: [], bet: 0, status: 'empty' },
-        { peerId: null, hand: [], bet: 0, status: 'empty' },
-        { peerId: null, hand: [], bet: 0, status: 'empty' },
-        { peerId: null, hand: [], bet: 0, status: 'empty' }
-    ],
+    seats: Array(5).fill(null).map(() => ({
+        peerId: null,
+        hand: [],
+        bet: 0,
+        status: 'empty'
+    })),
     activeSeatIndex: -1,
     timer: 0,
     type: 'blackjack'
@@ -77,7 +82,7 @@ export const createInitialState = (): BJGameState => ({
 
 /**
  * Resets the game state for the betting phase.
- * Clears hands and bets for occupied seats, preparing them for a new round.
+ * Clears hands and bets for occupied seats, transitioning them to 'betting'.
  *
  * @param current - The current game state.
  * @returns A new game state object transitioned to the 'betting' phase.
@@ -95,14 +100,15 @@ export const resetForBetting = (current: BJGameState): BJGameState => ({
 });
 
 /**
- * Advances the game flow.
- *
- * Checks if there is another player waiting to act. If so, passes the turn to them.
- * If all players have finished, executes the Dealer's turn (hit until 17) and determines winners.
+ * Advances the game flow logic.
+ * * 1. Checks if there is another player waiting to act (status === 'playing').
+ * 2. If players remain, moves index to that seat.
+ * 3. If no players remain, executes the Dealer's turn (hit until soft 17).
+ * 4. Determines winners/losers and moves to 'payout'.
  *
  * @param currentState - The current game state (immutable).
  * @param deck - The current game deck (mutable - cards will be popped).
- * @returns The new game state representing the next turn or end-of-round results.
+ * @returns The new game state.
  */
 export const processNextTurn = (currentState: BJGameState, deck: Card[]): BJGameState => {
     const next: BJGameState = {
@@ -113,7 +119,7 @@ export const processNextTurn = (currentState: BJGameState, deck: Card[]): BJGame
 
     let nextIndex = next.activeSeatIndex + 1;
 
-    // Look for the next seat
+    // Search for the next active player
     while (nextIndex < next.seats.length) {
         if (next.seats[nextIndex].status === 'playing') {
             next.activeSeatIndex = nextIndex;
@@ -122,23 +128,28 @@ export const processNextTurn = (currentState: BJGameState, deck: Card[]): BJGame
         nextIndex++;
     }
 
-    // Dealer Turn
+    // --- Dealer Turn ---
     next.phase = 'dealerTurn';
     next.activeSeatIndex = -1;
-    next.dealerHand.map((c) => c.isHidden = false);
+
+    // Reveal Dealer's hole card
+    next.dealerHand = next.dealerHand.map(c => ({ ...c, isHidden: false }));
 
     let dealerVal = calculateHand(next.dealerHand);
+
+    // Dealer hits on 16 or less (Standard Rules)
     while (dealerVal < 17) {
         const card = deck.pop();
         if (card) {
             next.dealerHand.push(card);
         } else {
+            // Edge case: Deck empty during dealer turn
             break;
         }
         dealerVal = calculateHand(next.dealerHand);
     }
 
-    // Determine Winners
+    // --- Determine Winners ---
     next.phase = 'payout';
 
     next.seats.forEach(s => {

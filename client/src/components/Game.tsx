@@ -7,7 +7,7 @@ import { PerspectiveCamera, Preload, useProgress } from '@react-three/drei';
 import { Bloom, EffectComposer, Pixelation } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
-// Game Context & Hooks
+// Context & Hooks
 import { useNetwork } from '../context/NetworkContext';
 import { useGameP2P } from '../hooks/useGameP2P';
 import { useThemeColor } from '../hooks/useThemeColor';
@@ -21,7 +21,8 @@ import {
     type PlayerPose,
     type PortalDef,
     type RemotePlayerState,
-    type SceneType
+    type SceneType,
+    type NetworkMessage
 } from './game/GameConfig';
 
 import { LEVELS } from './game/LevelData';
@@ -41,30 +42,47 @@ import {
     FishingHUD
 } from './game/ui';
 
+/**
+ * Type definition mapping message types to their specific handler signatures.
+ * This enforces strict typing for the handler object without causing TS2590 (Union too complex).
+ */
+type NetworkHandlerMap = {
+    [K in NetworkMessage['type']]: (
+        data: Extract<NetworkMessage, { type: K }>,
+        conn: DataConnection
+    ) => void;
+};
+
 export default function Game() {
     const { peerId } = useNetwork();
     const [, startTransition] = useTransition();
 
-    // --- ASSET LOADING STATE ---
+    // --- ASSET LOADING ---
     const { active, progress, total } = useProgress();
     const [assetsLoaded, setAssetsLoaded] = useState(false);
+    const isLoadedRef = useRef(false);
 
     useEffect(() => {
-        if (progress === 100 || (total === 0 && !active)) {
-            setAssetsLoaded(true);
+        if (isLoadedRef.current) return;
+
+        const isFinished = progress === 100 || (total === 0 && !active);
+        if (isFinished) {
+            isLoadedRef.current = true;
+            // Push state update to next tick to avoid synchronous render loop warnings
+            setTimeout(() => setAssetsLoaded(true), 0);
         }
     }, [progress, total, active]);
 
     const isReady = peerId !== null && assetsLoaded;
 
-    // Global State
+    // --- GLOBAL STATE ---
     const [gameState, setGameState] = useState<GameState>('menu');
     const [currentScene, setCurrentScene] = useState<SceneType>('bar');
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [isInputLocked, setIsInputLocked] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
 
-    // Player State
+    // --- PLAYER STATE ---
     const [playerSpawn, setPlayerSpawn] = useState<{ pos: [number, number, number]; rot: number }>({
         pos: [0, 0, 0],
         rot: Math.PI
@@ -73,7 +91,7 @@ export default function Game() {
     const [playerName, setPlayerName] = useState('');
     const [money, setMoney] = useState(100);
 
-    // Refs
+    // --- REFS ---
     const promptRef = useRef<HTMLDivElement>(null);
     const interactionStateRef = useRef<{ label: string | null }>({ label: null });
     const playerRef = useRef<THREE.Group>(null);
@@ -81,27 +99,29 @@ export default function Game() {
     const worldStateRef = useRef<Record<string, RemotePlayerState>>({});
     const initializedConnections = useRef<WeakSet<DataConnection>>(new WeakSet());
 
-    // Alerts
+    // --- SYSTEM FEED ---
     const [systemMessages, setSystemMessages] = useState<Array<{ id: number; text: string }>>([]);
     const alertIdRef = useRef(0);
+
     const addAlert = useCallback((text: string) => {
         const id = alertIdRef.current++;
         setSystemMessages(prev => [...prev, { id, text }]);
         setTimeout(() => setSystemMessages(prev => prev.filter(m => m.id !== id)), 3000);
     }, []);
 
-    // Network & P2P Setup
+    // --- NETWORK STATE ---
     const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayerState>>({});
     const [heirId, setHeirId] = useState<string | null>(null);
     const [ping, setPing] = useState<number>(0);
 
-    // Environment
+    // --- ENVIRONMENT STATE ---
     const [isFireLit, setIsFireLit] = useState(true);
     const sunColor = useThemeColor('--game-sun-color') || '#fff7ed';
     const isNight = sunColor === '#000000' || sunColor === 'rgb(0, 0, 0)';
     const isDay = !isNight;
     const isRaining = !isDay;
 
+    // --- P2P CALLBACKS ---
     const onPeerJoined = useCallback((id: string) => {
         addAlert(`Player ${ id.substring(0, 4).toUpperCase() } joined`);
     }, [addAlert]);
@@ -131,7 +151,7 @@ export default function Game() {
         joinRoom
     } = useGameP2P(onPeerJoined, onPeerLeft, heirId);
 
-    // --- Activity Management Hook ---
+    // --- GAME ENGINE / ACTIVITY HOOK ---
     const {
         activityState,
         dispatch: dispatchActivity,
@@ -149,7 +169,7 @@ export default function Game() {
 
     const isOccupied = bjSeatIndex !== -1 || !!fishingSeat;
 
-    // --- Inputs & UI visibility ---
+    // --- UI & INPUT EFFECTS ---
     useEffect(() => {
         if (isOccupied && promptRef.current) promptRef.current.style.opacity = '0';
     }, [isOccupied]);
@@ -162,87 +182,94 @@ export default function Game() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [gameState]);
 
-    // --- Network Handlers ---
-    const networkHandlers = useMemo(() => ({
-        'PLAYER_UPDATE': (data: any, conn: DataConnection) => {
+    // --- NETWORK MESSAGE HANDLERS ---
+
+    const networkHandlers: NetworkHandlerMap = useMemo(() => ({
+        PLAYER_UPDATE: (data, conn) => {
             const existing = worldStateRef.current[conn.peer];
             const newData = { ...existing, ...data.payload };
-            worldStateRef.current[conn.peer] = newData;
+            worldStateRef.current[conn.peer] = newData as RemotePlayerState;
+
             setRemotePlayers(prev => {
                 if (!prev[conn.peer] || prev[conn.peer].scene !== newData.scene) {
-                    return { ...prev, [conn.peer]: newData };
+                    return { ...prev, [conn.peer]: newData as RemotePlayerState };
                 }
                 return prev;
             });
         },
-        'PLAYER_SNAPSHOT': (data: any) => {
+        PLAYER_SNAPSHOT: (data) => {
             const { players, heirId } = data.payload;
             worldStateRef.current = players;
             setRemotePlayers(() => players);
             if (heirId) setHeirId(heirId);
         },
-        'ACTIVITY_UPDATE': (data: any) => {
+        ACTIVITY_UPDATE: (data) => {
             handleRemoteUpdate(data.payload.state);
         },
-        'WORLD_SNAPSHOT': (data: any) => {
+        WORLD_SNAPSHOT: (data) => {
             const { players, game, heirId } = data.payload;
             worldStateRef.current = players;
             setRemotePlayers(players);
             handleRemoteUpdate(game);
             setHeirId(heirId);
         },
-        'ACTIVITY_ACTION': (data: any, conn: DataConnection) => {
-            const { action, seatIndex, amount, ...extra } = data.payload;
-            // Bundle params correctly for composite handler
-            processAction(action, { seatIndex, amount, ...extra, playerId: conn.peer });
+        ACTIVITY_ACTION: (data, conn) => {
+            const { action, ...extra } = data.payload;
+            processAction(action, { ...extra, playerId: conn.peer });
         },
-        'HEARTBEAT': (_: any, conn: DataConnection) => {
+        HEARTBEAT: (_, conn) => {
             const existing = worldStateRef.current[conn.peer];
             if (existing) worldStateRef.current[conn.peer] = { ...existing, lastSeen: Date.now() };
         },
-        'PING': (data: any, conn: DataConnection) => {
+        PING: (data, conn) => {
             conn.send({ type: 'PONG', timestamp: data.timestamp });
             const existing = worldStateRef.current[conn.peer];
             if (existing) worldStateRef.current[conn.peer] = { ...existing, lastSeen: Date.now() };
         },
-        'PONG': (data: any) => setPing(Date.now() - data.timestamp),
-        'GAME_EVENT': (data: any) => {
-            if (data.payload.id === 'trash-fire') startTransition(() => setIsFireLit(data.payload.value));
+        PONG: (data) => setPing(Date.now() - data.timestamp),
+        GAME_EVENT: (data) => {
+            if (data.payload.id === 'trash-fire') startTransition(() => setIsFireLit(data.payload.value as boolean));
         },
-        'SYSTEM_MESSAGE': (data: any) => addAlert(data.payload)
+        SYSTEM_MESSAGE: (data) => addAlert(data.payload)
     }), [addAlert, handleRemoteUpdate, processAction]);
 
-    // FIX: Use a Ref for handlers so the event listener closure always sees the latest state
-    const handlersRef = useRef(networkHandlers);
-    handlersRef.current = networkHandlers;
+    const handlersRef = useRef<NetworkHandlerMap>(networkHandlers);
 
     useEffect(() => {
+        handlersRef.current = networkHandlers;
+    }, [networkHandlers]);
+
+    // Setup Connection Listeners
+    useEffect(() => {
+        const handleData = (data: unknown, conn: DataConnection) => {
+            const msg = data as NetworkMessage;
+            const handler = handlersRef.current[msg.type];
+
+            if (handler) {
+                // Safe dispatch: Handler signature matches msg.type via the NetworkHandlerMap definition
+                (handler as (m: NetworkMessage, c: DataConnection) => void)(msg, conn);
+            }
+        };
+
         if (isHost) {
             connections.forEach((conn) => {
                 if (initializedConnections.current.has(conn)) return;
                 initializedConnections.current.add(conn);
-
-                // Listener uses the REF, avoiding Stale Closures
-                conn.on('data', (data: any) => {
-                    const handler = handlersRef.current[data.type as keyof typeof networkHandlers];
-                    if (handler) handler(data, conn);
-                });
+                conn.on('data', (data) => handleData(data, conn));
             });
         }
+
         if (!isHost && hostConn) {
-            const handleHostData = (data: any) => {
-                // Client side re-binds on render, but using ref is safer here too
-                const handler = handlersRef.current[data.type as keyof typeof networkHandlers];
-                if (handler) handler(data, hostConn);
-            };
-            hostConn.on('data', handleHostData);
+            const onHostData = (data: unknown) => handleData(data, hostConn);
+            hostConn.on('data', onHostData);
             return () => {
-                hostConn.off('data', handleHostData);
+                hostConn.off('data', onHostData);
             };
         }
-    }, [isHost, connections, hostConn]); // Removed networkHandlers from dep array to avoid churn
+    }, [isHost, connections, hostConn]);
 
-    // --- Interaction Logic ---
+    // --- INTERACTION LOGIC ---
+
     const handlePortalEnter = useCallback((portal: PortalDef) => {
         if (isTransitioning) return;
         startTransition(() => {
@@ -269,7 +296,7 @@ export default function Game() {
         if (id === 'trash-fire') {
             const newVal = !isFireLit;
             startTransition(() => setIsFireLit(newVal));
-            const msg = { type: 'GAME_EVENT', payload: { id: 'trash-fire', value: newVal } };
+            const msg: NetworkMessage = { type: 'GAME_EVENT', payload: { id: 'trash-fire', value: newVal } };
             if (isHost) connections.forEach(c => c.send(msg));
             else hostConn?.send(msg);
         } else if (id === 'start-fishing') {
@@ -280,8 +307,7 @@ export default function Game() {
         }
     }, [isHost, connections, hostConn, isFireLit, dispatchActivity, isDay, isRaining]);
 
-    // Action Router for UI inputs
-    const handleAction = (action: string, payload: any = {}) => {
+    const handleAction = (action: string, payload: Record<string, unknown> = {}) => {
         if (bjSeatIndex !== -1) {
             dispatchActivity(action, { ...payload, seatIndex: bjSeatIndex, targetActivity: 'blackjack' });
         } else if (fishingSeat) {
@@ -302,6 +328,10 @@ export default function Game() {
         (i) => i.behavior?.type === 'seat' && i.behavior.seatIndex === bjSeatIndex
     );
 
+    const seatExitLabel = currentInteractable?.behavior?.type === 'seat'
+        ? undefined
+        : undefined;
+
     const mySyncData = useMemo(() => {
         let act = null;
         if (bjSeatIndex !== -1) {
@@ -313,9 +343,11 @@ export default function Game() {
         return { money, isPaused, activity: act };
     }, [money, isPaused, bjSeatIndex, fishingSeat, activityState.blackjack.phase]);
 
+    // --- RENDER ---
 
     return (
         <div style={ { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' } }>
+            {/* 3D Scene Layer */ }
             <div className='absolute inset-0 z-0'>
                 <Canvas shadows dpr={ [1, 2] }
                         gl={ { toneMapping: THREE.ReinhardToneMapping, toneMappingExposure: 1.2 } }>
@@ -440,6 +472,7 @@ export default function Game() {
                 </Canvas>
             </div>
 
+            {/* UI Layer */ }
             <div className='absolute inset-0 z-10 pointer-events-none'>
                 { !isReady && (
                     <div
@@ -456,9 +489,13 @@ export default function Game() {
                 <TransitionOverlay isActive={ isTransitioning }/>
                 <NetworkIndicator roomCode={ roomCode } isHost={ isHost } ping={ ping }/>
                 { !isOccupied && isReady && <InteractionPrompt ref={ promptRef }/> }
-                { isPaused && <div className='pointer-events-auto'><EscOverlayMenu onResume={ () => setIsPaused(false) }
-                                                                                   onMainMenu={ () => window.location.reload() }/>
-                </div> }
+
+                { isPaused && (
+                    <div className='pointer-events-auto'>
+                        <EscOverlayMenu onResume={ () => setIsPaused(false) }
+                                        onMainMenu={ () => window.location.reload() }/>
+                    </div>
+                ) }
 
                 { bjSeatIndex !== -1 && (
                     <div className='absolute inset-0 pointer-events-none'>
@@ -471,7 +508,7 @@ export default function Game() {
                             onLeave={ handleLeaveBlackjack }
                             seatLabel={ currentInteractable?.label }
                             money={ money }
-                            exitLabel={ (currentInteractable?.behavior as any)?.exitLabel || 'Stand Up' }
+                            exitLabel={ seatExitLabel || 'Stand Up' }
                             gamePhase={ activityState.blackjack.phase }
                         />
                     </div>
@@ -492,17 +529,24 @@ export default function Game() {
 
                 { gameState === 'menu' && isReady && (
                     <div className='pointer-events-auto'>
-                        <MainMenu onHost={ async () => {
-                            await startHosting();
-                            setGameState('playing');
-                        } } onJoin={ async (id) => {
-                            await joinRoom(id);
-                            setGameState('playing');
-                        } } onNameChange={ setPlayerName } name={ playerName }/>
+                        <MainMenu
+                            onHost={ async () => {
+                                await startHosting();
+                                setGameState('playing');
+                            } }
+                            onJoin={ async (id) => {
+                                await joinRoom(id);
+                                setGameState('playing');
+                            } }
+                            onNameChange={ setPlayerName }
+                            name={ playerName }
+                        />
                     </div>
                 ) }
-                <div className='absolute top-10 right-4 z-100 pointer-events-none'><SystemFeed
-                    messages={ systemMessages }/></div>
+
+                <div className='absolute top-10 right-4 z-100 pointer-events-none'>
+                    <SystemFeed messages={ systemMessages }/>
+                </div>
             </div>
         </div>
     );

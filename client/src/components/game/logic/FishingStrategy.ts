@@ -4,17 +4,31 @@ import { selectFish } from './FishingData';
 const BASE_BITE_TIME = 8000;
 const REACTION_WINDOW = 1000;
 
-// Validation Helper
-const isValidFishingAction = (action: string): boolean => {
-    const validActions = new Set([
-        'JOIN_FISHING', 'LEAVE', 'CAST', 'WIGGLE',
-        'TRIGGER_BITE', 'REEL', 'FAIL_REEL', 'RESET', 'UPDATE_ENV'
-    ]);
-    return validActions.has(action);
-};
+// Set of allowed actions for O(1) lookup validation
+const VALID_ACTIONS = new Set([
+    'JOIN_FISHING',
+    'LEAVE',
+    'CAST',
+    'WIGGLE',
+    'TRIGGER_BITE',
+    'REEL',
+    'FAIL_REEL',
+    'RESET',
+    'UPDATE_ENV'
+]);
+
+// Internal interface for type-safety inside the reducer
+interface FishingPayload {
+    playerId?: string;
+    env?: { isDay: boolean; isRaining: boolean };
+}
 
 export const FishingStrategy: ActivityStrategy<FishingState> = {
 
+    /**
+     * Initializes the default state for the Fishing activity.
+     * Sets up an empty seat registry and default environment conditions.
+     */
     onMount: () => {
         return {
             type: 'fishing',
@@ -24,17 +38,29 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
         };
     },
 
-    // IMPLEMENTED: Gatekeeper Logic
-    onAction: (action, payload, _ctx) => {
-        // 1. Unknown Action Check
-        if (!isValidFishingAction(action)) {
+    /**
+     * Action Validator.
+     * Acts as a gatekeeper to ensure all incoming actions are valid and contain
+     * the necessary payload data before reaching the reducer.
+     * @param action
+     * @param payload - The untrusted payload object from the network.
+     */
+    onAction: (action, payload) => {
+        // 1. Validate Action Existence
+        if (!VALID_ACTIONS.has(action)) {
             console.warn(`FishingStrategy: Unknown action rejected: ${ action }`);
             return false;
         }
 
-        // 2. Payload Integrity Checks
-        const { playerId, env } = payload || {};
+        // 2. Validate Payload Shape
+        // We cast to Record<string, unknown> to safely access properties without
+        // assuming their types, allowing for strict runtime checks below.
+        const p = (payload || {}) as Record<string, unknown>;
 
+        const playerId = p.playerId;
+        const env = p.env as Record<string, unknown> | undefined;
+
+        // Special Case: Environment updates rely on 'env' object, not playerId
         if (action === 'UPDATE_ENV') {
             if (!env || typeof env.isDay !== 'boolean') {
                 console.warn("FishingStrategy: Invalid Env Update");
@@ -43,15 +69,14 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
             return true;
         }
 
-        // All other actions require a valid Player ID
+        // Standard Case: Player Actions require a valid string ID
         if (!playerId || typeof playerId !== 'string') {
             console.warn(`FishingStrategy: Action ${ action } missing valid playerId`);
             return false;
         }
 
-        // 3. Contextual Checks (Example: Casting requirements)
+        // 3. Validate Contextual Data
         if (action === 'CAST' && env) {
-            // If environment is provided during cast, validate it
             if (typeof env.isDay !== 'boolean' || typeof env.isRaining !== 'boolean') {
                 console.warn("FishingStrategy: Malformed Env in Cast");
                 return false;
@@ -61,10 +86,16 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
         return true;
     },
 
-    reducer: (state: FishingState, action: string, payload: any): FishingState => {
-        const { playerId, env } = payload;
+    /**
+     * State Reducer.
+     * Handles all state transitions for the fishing gameplay loop:
+     * Casting -> Waiting -> Bitten -> Reeling -> Caught/Lost.
+     */
+    reducer: (state: FishingState, action: string, payload: unknown): FishingState => {
+        // Safe to cast to strict type here because onAction has validated the shape
+        const { playerId, env } = payload as FishingPayload;
 
-        // Helper to update a specific seat
+        // Helper to update a specific seat immutably
         const updateSeat = (pId: string, updater: (s: FishingSeat) => FishingSeat) => {
             return {
                 ...state,
@@ -73,11 +104,11 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
         };
 
         switch (action) {
-            case 'JOIN_FISHING':
-                // Logic: Prevent duplicates
-                if (state.seats.find(s => s.peerId === playerId)) return state;
+            case 'JOIN_FISHING': {
+                // Prevent duplicate seats for the same player
+                if (!playerId || state.seats.find(s => s.peerId === playerId)) return state;
 
-                // Sync env if provided on join
+                // Sync environment if provided during join
                 const joinState = env ? { ...state, env } : state;
 
                 return {
@@ -90,6 +121,7 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
                         lastCatch: null
                     }]
                 };
+            }
 
             case 'LEAVE':
                 return {
@@ -97,45 +129,55 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
                     seats: state.seats.filter(s => s.peerId !== playerId)
                 };
 
-            case 'CAST':
+            case 'CAST': {
+                if (!playerId) return state;
                 const castState = env ? { ...state, env } : state;
                 return {
                     ...castState,
                     seats: castState.seats.map(s => s.peerId === playerId ? {
                         ...s,
                         phase: 'waiting',
+                        // Calculate bite timer: Base time +/- random deviation
                         timer: Date.now() + BASE_BITE_TIME + (Math.random() * 4000 - 2000),
                         biteStrength: 0,
                         lastCatch: null
                     } : s)
                 };
+            }
 
             case 'WIGGLE':
+                if (!playerId) return state;
                 return updateSeat(playerId, s => {
                     if (s.phase !== 'waiting') return s;
-                    // Wiggling reduces timer (attracts fish) but clamps to 500ms min
+                    // Wiggling reduces the wait timer (attracts fish)
+                    // but is clamped to a minimum to prevent instant catches.
                     return { ...s, timer: Math.max(Date.now() + 500, s.timer - 200) };
                 });
 
             case 'TRIGGER_BITE':
+                if (!playerId) return state;
                 return updateSeat(playerId, s => ({
                     ...s,
                     phase: 'bitten',
                     timer: Date.now() + REACTION_WINDOW
                 }));
 
-            case 'REEL':
+            case 'REEL': {
+                if (!playerId) return state;
                 const seat = state.seats.find(s => s.peerId === playerId);
                 if (!seat || seat.phase !== 'bitten') return state;
 
                 const now = Date.now();
+
+                // Fail if player reacted too late
                 if (now > seat.timer) {
                     return updateSeat(playerId, s => ({ ...s, phase: 'lost', timer: 0 }));
                 }
 
-                // Success! Select fish based on current environment
+                // Success: Determine catch based on current environment
                 const result = selectFish(state.env?.isDay ?? true, state.env?.isRaining ?? false);
 
+                // Update shared Catch Log
                 const newLog = {
                     ...state.catchLog,
                     [result.fishId]: {
@@ -153,11 +195,14 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
                         lastCatch: result
                     } : s)
                 };
+            }
 
             case 'FAIL_REEL':
+                if (!playerId) return state;
                 return updateSeat(playerId, s => ({ ...s, phase: 'lost' }));
 
             case 'RESET':
+                if (!playerId) return state;
                 return updateSeat(playerId, s => ({ ...s, phase: 'idle', lastCatch: null }));
 
             case 'UPDATE_ENV':
@@ -168,17 +213,22 @@ export const FishingStrategy: ActivityStrategy<FishingState> = {
         }
     },
 
+    /**
+     * Host Game Loop.
+     * Runs on the host machine to monitor timers and trigger server-side events
+     * (e.g., bites when a timer expires, or failures when a reaction window is missed).
+     */
     onTick: (state: FishingState, ctx: ActivityContext) => {
         if (!ctx.isHost) return;
         const now = Date.now();
 
         state.seats.forEach(seat => {
+            // Transition from Waiting -> Bitten
             if (seat.phase === 'waiting' && now >= seat.timer) {
-                // Dispatch targeted event
                 ctx.dispatch('TRIGGER_BITE', { playerId: seat.peerId });
             }
+            // Transition from Bitten -> Lost (Missed reaction)
             if (seat.phase === 'bitten' && now > seat.timer) {
-                // Timeout missed bite
                 ctx.dispatch('FAIL_REEL', { playerId: seat.peerId });
             }
         });

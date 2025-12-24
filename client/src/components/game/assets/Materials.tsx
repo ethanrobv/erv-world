@@ -49,7 +49,7 @@ const COMMON_GLSL = `
  * procedural texturing without the overhead of ShaderMaterial boilerplate.
  */
 const createWorldProceduralMaterial = (
-    uniforms: Record<string, any>,
+    uniforms: Record<string, { value: unknown }>,
     colorLogic: string,
     normalLogic: string,
     parameters?: THREE.MeshStandardMaterialParameters

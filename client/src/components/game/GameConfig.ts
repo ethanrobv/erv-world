@@ -22,7 +22,6 @@ export type Card = {
 
 export type ActivityType = 'blackjack' | 'fishing';
 
-// 1. BLACKJACK STATE (Unchanged logic, just specific type)
 export type BJSeatState = {
     peerId: string | null;
     hand: Card[];
@@ -39,7 +38,6 @@ export interface BJGameState {
     timer: number;
 }
 
-// 2. FISHING STATE (Refactored for Multiplayer)
 export type FishType = {
     id: string;
     name: string;
@@ -51,26 +49,21 @@ export type FishType = {
 
 export type CatchRecord = { count: number; maxWeight: number };
 
-// New: Individual Fishing Seat
 export type FishingSeat = {
     peerId: string;
     phase: 'idle' | 'casting' | 'waiting' | 'bitten' | 'reeling' | 'caught' | 'lost';
-    timer: number;       // Individual bite/reel timer
-    biteStrength: number; // Individual bobber physics
+    timer: number;
+    biteStrength: number;
     lastCatch: { fishId: string; weight: number } | null;
 };
 
 export interface FishingState {
     type: 'fishing';
-    // Global Stats (Shared)
     catchLog: Record<string, CatchRecord>;
     env: { isDay: boolean; isRaining: boolean };
-    // Participants
     seats: FishingSeat[];
 }
 
-// 3. COMPOSITE WORLD STATE
-// This allows both activities to run concurrently
 export interface ActivityState {
     blackjack: BJGameState;
     fishing: FishingState;
@@ -86,7 +79,7 @@ export type RemotePlayerState = {
     lastSeen?: number;
     name?: string;
     activity?: { type: ActivityType; phase: string };
-    meta?: any;
+    meta?: Record<string, unknown>;
 };
 
 export type Barrier = {
@@ -131,7 +124,7 @@ export type Interactable = {
     rotation?: [number, number, number];
     interactionRadius: number;
     behavior?: InteractionBehavior;
-    [key: string]: any;
+    [key: string]: unknown;
 };
 
 export type LevelData = {
@@ -148,9 +141,8 @@ export type ActivityContext = {
     money: number;
     setMoney: React.Dispatch<React.SetStateAction<number>>;
     addAlert: (msg: string) => void;
-    gameAssets: React.RefObject<any>;
-    // Updated: Dispatch now implies targeting the strategy that called it
-    dispatch: (action: string, payload?: any) => void;
+    gameAssets: React.RefObject<unknown>;
+    dispatch: (action: string, payload?: Record<string, unknown>) => void;
     connections: DataConnection[];
 };
 
@@ -158,13 +150,13 @@ export interface ActivityStrategy<T> {
     reducer: (
         prev: T,
         action: string,
-        payload: any,
-        assets: React.RefObject<any>
+        payload: unknown,
+        assets: React.RefObject<unknown>
     ) => T;
 
     onAction?: (
         action: string,
-        payload: any,
+        payload: unknown,
         ctx: ActivityContext
     ) => boolean;
 
@@ -180,7 +172,32 @@ export interface ActivityStrategy<T> {
     ) => void;
 
     onMount?: (
-        state: T, // Receives global state to extract its slice if needed
+        state: T,
         ctx: ActivityContext
     ) => T;
 }
+
+// --- NETWORK MESSAGES ---
+
+export type NetworkMessage =
+    | { type: 'PLAYER_UPDATE'; payload: Partial<RemotePlayerState> }
+    | {
+    type: 'PLAYER_SNAPSHOT';
+    payload: { players: Record<string, RemotePlayerState>; heirId: string | null; timestamp: number }
+}
+    | { type: 'ACTIVITY_UPDATE'; payload: { state: ActivityState; timestamp: number } }
+    | {
+    type: 'WORLD_SNAPSHOT';
+    payload: {
+        players: Record<string, RemotePlayerState>;
+        game: ActivityState;
+        heirId: string | null;
+        timestamp: number
+    }
+}
+    | { type: 'ACTIVITY_ACTION'; payload: { action: string } & Record<string, unknown> }
+    | { type: 'HEARTBEAT' }
+    | { type: 'PING'; timestamp: number }
+    | { type: 'PONG'; timestamp: number }
+    | { type: 'GAME_EVENT'; payload: { id: string; value: unknown } }
+    | { type: 'SYSTEM_MESSAGE'; payload: string };

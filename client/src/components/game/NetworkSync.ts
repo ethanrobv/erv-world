@@ -2,7 +2,14 @@ import React, { useRef, useEffect } from 'react';
 import type { DataConnection } from 'peerjs';
 import { useFrame } from '@react-three/fiber';
 import { useWorkerInterval } from '../../hooks/useWorkerInterval';
-import type { GameState, PlayerPose, SceneType, ActivityState, RemotePlayerState } from './GameConfig';
+import type {
+    GameState,
+    PlayerPose,
+    SceneType,
+    ActivityState,
+    RemotePlayerState,
+    NetworkMessage // Added import
+} from './GameConfig';
 import * as THREE from 'three';
 
 interface NetworkSyncProps {
@@ -22,7 +29,7 @@ interface NetworkSyncProps {
     activityState: ActivityState;
     setPing?: (ping: number) => void;
     playerName: string;
-    syncData?: Record<string, any>;
+    syncData?: Record<string, unknown>;
 }
 
 export function NetworkSync({
@@ -47,7 +54,8 @@ export function NetworkSync({
     const lastBroadcastRef = useRef(0);
     const lastPruneRef = useRef(0);
 
-    const BROADCAST_RATE_MS = 33; // ~30 FPS
+    // Config: 30 FPS updates, 4s Timeout
+    const BROADCAST_RATE_MS = 33;
     const TIMEOUT_MS = 4000;
 
     const connectionsRef = useRef(connections);
@@ -55,7 +63,7 @@ export function NetworkSync({
         connectionsRef.current = connections;
     }, [connections]);
 
-    // --- HOST: Optimize Game State Broadcasting ---
+    // --- HOST: Activity State Broadcasting ---
     useEffect(() => {
         if (!isHost) return;
 
@@ -72,7 +80,7 @@ export function NetworkSync({
         });
     }, [isHost, activityState]);
 
-    // --- HOST: Heartbeats ---
+    // --- HOST: Keep-Alive Heartbeats ---
     useWorkerInterval(() => {
         if (!isHost) return;
         const now = Date.now();
@@ -83,7 +91,7 @@ export function NetworkSync({
         }
     }, isHost ? 500 : null);
 
-    // --- CLIENT: Ping Host ---
+    // --- CLIENT: Latency Ping ---
     useWorkerInterval(() => {
         if (isHost || !hostConn || !hostConn.open) return;
         hostConn.send({ type: 'PING', timestamp: Date.now() });
@@ -91,35 +99,32 @@ export function NetworkSync({
 
     // --- HOST PROMOTION & INITIAL SYNC ---
     useEffect(() => {
-        if (isHost) {
-            // 1. Immediate Cleanup: Remove the old host/stale players to prevent ghosts
+        if (isHost && worldStateRef.current) {
+            // 1. Cleanup stale players (e.g., previous crashed host)
             const now = Date.now();
-            if (worldStateRef.current) {
-                const nextState = { ...worldStateRef.current };
-                let didPrune = false;
+            const nextState = { ...worldStateRef.current };
+            let didPrune = false;
 
-                Object.entries(nextState).forEach(([id, p]) => {
-                    // If a player hasn't been seen in >4s, they are likely the crashed host
-                    if (id !== peerId && (!p.lastSeen || now - p.lastSeen > TIMEOUT_MS)) {
-                        delete nextState[id];
-                        didPrune = true;
-                    }
-                });
-
-                if (didPrune) {
-                    worldStateRef.current = nextState;
-                    setRemotePlayers(nextState);
-                    const msg = 'Host migrated';
-                    addAlert(msg);
-
-                    connections.forEach(conn => {
-                        if (conn.open) conn.send({ type: 'SYSTEM_MESSAGE', payload: msg });
-                    });
+            Object.entries(nextState).forEach(([id, p]) => {
+                if (id !== peerId && (!p.lastSeen || now - p.lastSeen > TIMEOUT_MS)) {
+                    delete nextState[id];
+                    didPrune = true;
                 }
+            });
+
+            if (didPrune) {
+                worldStateRef.current = nextState;
+                setRemotePlayers(nextState);
+                const msg = 'Host migrated';
+                addAlert(msg);
+
+                connections.forEach(conn => {
+                    if (conn.open) conn.send({ type: 'SYSTEM_MESSAGE', payload: msg });
+                });
             }
 
-            // 2. Send World Snapshot to existing connections
-            const allIds = Object.keys(worldStateRef.current || {}).sort();
+            // 2. Broadcast World Snapshot
+            const allIds = Object.keys(worldStateRef.current).sort();
             const nextHeir = allIds.find(id => id !== peerId) || null;
 
             const initialSnapshot = {
@@ -135,71 +140,82 @@ export function NetworkSync({
                 }
             });
         }
-    }, [isHost]); // Only runs once on promotion
+    }, [isHost, connections, peerId, activityState, addAlert, setRemotePlayers, worldStateRef]);
 
     // --- PING/PONG HANDLER ---
     useEffect(() => {
         if (isHost || !hostConn || !setPing) return;
-        const handler = (data: any) => {
-            if (data.type === 'PONG') setPing(Date.now() - data.timestamp);
+
+        // Use 'unknown' type to satisfy ESLint, then narrow via type guard or casting
+        const handler = (data: unknown) => {
+            // Safe cast assuming the data follows our NetworkMessage structure
+            const msg = data as NetworkMessage;
+            if (msg.type === 'PONG') {
+                setPing(Date.now() - msg.timestamp);
+            }
         };
+
         hostConn.on('data', handler);
         return () => {
             hostConn.off('data', handler);
         };
     }, [isHost, hostConn, setPing]);
 
-    // --- MAIN FRAME LOOP ---
+    // --- MAIN GAME LOOP (UseFrame) ---
     useFrame(() => {
-        if (gameState !== 'playing' || !playerRef.current || !peerId) return;
+        if (gameState !== 'playing' || !playerRef.current || !peerId || !worldStateRef.current) return;
 
         const nowMs = Date.now();
         const shouldSend = (nowMs - lastBroadcastRef.current) > BROADCAST_RATE_MS;
 
-        // Construct the payload with specific Activity data and generic Metadata
         const myPayload: RemotePlayerState = {
             pos: [
                 playerRef.current.position.x,
                 playerRef.current.position.y,
                 playerRef.current.position.z
-            ] as [number, number, number],
+            ],
             rot: visualsRef.current?.rotation.y || 0,
             pose: playerPose,
             interaction: interactionRef.current?.label || null,
             scene: currentScene,
             lastSeen: nowMs,
             name: playerName,
-            activity: syncData?.activity,
+            activity: syncData?.activity as { type: ActivityState['fishing']['type']; phase: string } | undefined,
             meta: syncData
         };
 
-        if (isHost && worldStateRef.current) {
+        if (isHost) {
             // -- HOST LOGIC --
+            // Update self in world state
             worldStateRef.current[peerId] = { ...worldStateRef.current[peerId], ...myPayload };
 
-            // Pruning Logic (Every 500ms)
+            // Pruning Logic (Run every 500ms to save CPU)
             if ((nowMs - lastPruneRef.current) > 500) {
                 lastPruneRef.current = nowMs;
                 const deadIds: string[] = [];
+
                 Object.entries(worldStateRef.current).forEach(([id, p]) => {
                     if (id === peerId) return;
-                    if (p.isFading) return; // Already handling fade out
+                    if (p.isFading) return;
                     if (p.lastSeen && (nowMs - p.lastSeen > TIMEOUT_MS)) deadIds.push(id);
                 });
 
                 if (deadIds.length > 0) {
                     deadIds.forEach(id => {
-                        if (worldStateRef.current[id]) {
+                        if (worldStateRef.current?.[id]) {
+                            // Mark as fading first
                             worldStateRef.current[id].isFading = true;
                             const msg = `Player ${ id.substring(0, 4).toUpperCase() } disconnected`;
                             addAlert(msg);
+
                             connectionsRef.current.forEach(conn => {
                                 if (conn.open) conn.send({ type: 'SYSTEM_MESSAGE', payload: msg });
                             });
 
+                            // Trigger React update for visual fade
                             setRemotePlayers({ ...worldStateRef.current });
 
-                            // Remove completely after fade
+                            // Hard delete after fade animation
                             setTimeout(() => {
                                 if (worldStateRef.current) {
                                     const next = { ...worldStateRef.current };
@@ -214,7 +230,7 @@ export function NetworkSync({
             }
 
             if (shouldSend) {
-                // Calculate Heir ID Dynamically
+                // Calculate Heir (next longest-connected player)
                 const allIds = Object.keys(worldStateRef.current).sort();
                 const nextHeir = allIds.find(id => id !== peerId) || null;
 

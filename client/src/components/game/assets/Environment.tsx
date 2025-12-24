@@ -168,7 +168,9 @@ export const LakeWater = ({ position, width, length, isRaining = false }: Dimens
     const mudColor = '#3f2e18';
     const shaderRef = useRef<THREE.ShaderMaterial>(null);
 
-    const shaderArgs = useMemo(() => ({
+    // Use useState for initialization to ensure stability and avoid dependency warnings.
+    // Dynamic updates are handled in useFrame.
+    const [shaderArgs] = useState(() => ({
         uniforms: {
             uColor: { value: new THREE.Color(waterColor) },
             uTime: { value: 0 },
@@ -176,7 +178,7 @@ export const LakeWater = ({ position, width, length, isRaining = false }: Dimens
         },
         vertexShader: LakeWaterShader.vertexShader,
         fragmentShader: LakeWaterShader.fragmentShader
-    }), []);
+    }));
 
     useFrame((state) => {
         if (shaderRef.current) {
@@ -357,7 +359,9 @@ export const HangingLamp = ({ position, color, intensity = 40 }: {
     intensity?: number;
 }) => {
     const shadeColor = useThemeColor('--game-object-metal') || '#52525b';
-    const lightColor = color || useThemeColor('--game-light-warm') || '#ffaa00';
+    const themeLightColor = useThemeColor('--game-light-warm');
+    const lightColor = color || themeLightColor || '#ffaa00';
+
     const metalMat = useNoiseMaterial(shadeColor, 2.0, 0.05);
 
     return (
@@ -453,7 +457,11 @@ export const NeonSign = ({ position, rotation = [0, 0, 0], text, color }: {
     color?: string;
 }) => {
     const frameColor = '#111111';
-    const neonColor = color || useThemeColor('--game-neon-main') || '#db2777';
+
+    // FIX: Call hook unconditionally
+    const themeNeonColor = useThemeColor('--game-neon-main');
+    const neonColor = color || themeNeonColor || '#db2777';
+
     return (
         <group position={ position } rotation={ rotation }>
             <SoftBlock args={ [2.5, 1, 0.1] } color={ frameColor }/>
@@ -542,13 +550,15 @@ export const BarCounter = React.memo(({ position }: { position: Position }) => {
 
 export const BarBackWall = React.memo(({ position, isDay }: { position: Position; isDay: boolean }) => {
     const shelfColor = useThemeColor('--bg-surface-highlight') || '#3f3f46';
-    const palette = [
-        useThemeColor('--game-accent') || '#f59e0b',
-        useThemeColor('--brand-primary') || '#2563eb',
-        useThemeColor('--text-main') || '#ffffff'
-    ];
 
-    const { bottomRow, topRow } = useMemo(() => {
+    // Fix: Move useThemeColor calls outside the array literal to satisfy strict hook rules.
+    const c1 = useThemeColor('--game-accent') || '#f59e0b';
+    const c2 = useThemeColor('--brand-primary') || '#2563eb';
+    const c3 = useThemeColor('--text-main') || '#ffffff';
+    const palette = useMemo(() => [c1, c2, c3], [c1, c2, c3]);
+
+    // Fix: Use useState for pure initialization of random data instead of useMemo.
+    const [{ bottomRow, topRow }] = useState(() => {
         const generateRow = (count: number, widthSpread: number) =>
             new Array(count).fill(0).map((_, i) => ({
                 id: Math.random(),
@@ -558,7 +568,7 @@ export const BarBackWall = React.memo(({ position, isDay }: { position: Position
                 width: 0.15 + Math.random() * 0.1
             }));
         return { bottomRow: generateRow(6, 2.4), topRow: generateRow(4, 1.5) };
-    }, []);
+    });
 
     return (
         <group position={ position }>
@@ -600,7 +610,9 @@ export const AlleyArchitecture = React.memo(({ position }: { position: Position 
 const WindowRain = () => {
     const count = 400;
     const shaderRef = useRef<THREE.ShaderMaterial>(null);
-    const { positions, speeds } = useMemo(() => {
+
+    // Fix: Use useState for pure initialization of random arrays
+    const [{ positions, speeds }] = useState(() => {
         const pos = new Float32Array(count * 3);
         const spd = new Float32Array(count);
         for (let i = 0; i < count; i++) {
@@ -610,7 +622,7 @@ const WindowRain = () => {
             spd[i] = 4.0 + Math.random() * 5.0;
         }
         return { positions: pos, speeds: spd };
-    }, []);
+    });
 
     useFrame((state) => {
         if (shaderRef.current) shaderRef.current.uniforms.uTime.value = state.clock.elapsedTime;
@@ -676,7 +688,9 @@ export const WindowUnit = ({ position, rotation = [0, 0, 0], isDay }: {
 export const SceneRain = () => {
     const count = 3000;
     const shaderRef = useRef<THREE.ShaderMaterial>(null);
-    const { positions, speeds } = useMemo(() => {
+
+    // Fix: Use useState for pure initialization
+    const [{ positions, speeds }] = useState(() => {
         const pos = new Float32Array(count * 3);
         const spd = new Float32Array(count);
         for (let i = 0; i < count; i++) {
@@ -686,7 +700,7 @@ export const SceneRain = () => {
             spd[i] = 6.0 + Math.random() * 6.0;
         }
         return { positions: pos, speeds: spd };
-    }, []);
+    });
 
     useFrame((state) => {
         if (shaderRef.current) shaderRef.current.uniforms.uTime.value = state.clock.elapsedTime;
@@ -715,7 +729,8 @@ export const TrashCanFire = React.memo(({ position, isOn }: { position: Position
     const canColor = useThemeColor('--game-object-metal') || '#52525b';
     const noiseMat = useNoiseMaterial(canColor, 4.0, 0.05);
 
-    const timeOffset = useMemo(() => Math.random() * 100, []);
+    // Fix: Use useState for pure initialization
+    const [timeOffset] = useState(() => Math.random() * 100);
 
     useFrame((state) => {
         if (!isOn) return;

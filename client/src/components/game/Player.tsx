@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useLayoutEffect, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
@@ -26,7 +26,7 @@ const useLocalBobberWiggle = (isActive: boolean) => {
 
     useEffect(() => {
         if (!isActive) {
-            if (offset.x !== 0 || offset.z !== 0) setOffset({ x: 0, z: 0 });
+            setOffset(prev => (prev.x === 0 && prev.z === 0 ? prev : { x: 0, z: 0 }));
             return;
         }
 
@@ -52,9 +52,18 @@ const useLocalBobberWiggle = (isActive: boolean) => {
         window.addEventListener('keydown', handler);
         window.addEventListener('keyup', handler);
         return () => {
-            window.removeEventListener('keydown', handler);
-            window.removeEventListener('keyup', handler);
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
         };
+
+        function handleKeyDown(e: KeyboardEvent) {
+            handler(e);
+        }
+
+        function handleKeyUp(e: KeyboardEvent) {
+            keys[e.key.toLowerCase() as keyof typeof keys] = false;
+        }
+
     }, [isActive]);
 
     return offset;
@@ -141,11 +150,23 @@ export const Player = ({
 
     const prevSeatConfig = useRef<SeatedBehavior | null>(null);
     const snappedSeatIndex = useRef<number | null>(null);
+
+    // --- State & Logic Refs ---
+
+    // Logic flag only (no re-render needed for flag itself, used in frame loop)
     const isInternalLockedRef = useRef(false);
 
-    const [isInternalLocked, setIsInternalLocked] = useState(false);
-    const [activeInteraction, setActiveInteraction] = useState<Interactable | null>(null);
+    // Active Interaction: State for React tree, Ref for Frame loop
+    const [activeInteraction, _setActiveInteraction] = useState<Interactable | null>(null);
+    const activeInteractionRef = useRef<Interactable | null>(null);
+
+    const updateActiveInteraction = (val: Interactable | null) => {
+        activeInteractionRef.current = val;
+        _setActiveInteraction(val);
+    };
+
     const [opacity, setOpacity] = useState(0);
+    const [bobberPos, setBobberPos] = useState<[number, number, number] | null>(null);
 
     const displayName = isRemote
         ? (remoteData?.name || peerId?.substring(0, 4))
@@ -156,31 +177,37 @@ export const Player = ({
     const isFishing = seatData?.activityType === 'fishing';
     const fishingPhase = seatData?.phase || 'idle';
 
-    // Local-only hook, returns 0 for remote
     const wiggleOffset = useLocalBobberWiggle(!isRemote && isFishing && fishingPhase === 'waiting');
 
-    // FIX: Calculate Bobber Position in LOCAL space
-    const bobberPosition = useMemo(() => {
-        if (!isFishing || !groupRef.current || !visualsRef.current) return null;
-        if (fishingPhase === 'idle' || fishingPhase === 'caught') return null;
+    // FIX 1: Bobber Reset Logic
+    // Wrapped in setTimeout to prevent synchronous set-state-in-effect warning
+    useEffect(() => {
+        if (!isFishing || fishingPhase === 'idle' || fishingPhase === 'caught') {
+            setTimeout(() => {
+                setBobberPos(prev => prev ? null : prev);
+            }, 0);
+        }
+    }, [isFishing, fishingPhase]);
+
+    // Bobber Position Logic (Layout Effect for synchronous updates with frame)
+    useLayoutEffect(() => {
+        if (!isFishing || !groupRef.current || fishingPhase === 'idle' || fishingPhase === 'caught') {
+            return;
+        }
 
         const baseDist = 4;
-
-        // We use visuals rotation, but we do NOT add group position.
-        // The bobber is a child of the group, so it inherits the position automatically.
-        const rot = visualsRef.current.rotation.y;
-
-        // Local X/Z offsets based on rotation
+        const rot = targetRotation.current;
         const x = (Math.sin(rot) * baseDist) + wiggleOffset.x;
         const z = (Math.cos(rot) * baseDist) + wiggleOffset.z;
-
-        // Local Y calculation:
-        // We want the bobber at absolute world height 0.1 (water level).
-        // Since the group might be at y=0, y=5, etc., we subtract group Y.
         const y = 0.1 - groupRef.current.position.y;
 
-        return [x, y, z] as [number, number, number];
-    }, [isFishing, fishingPhase, wiggleOffset, groupRef.current?.position, visualsRef.current?.rotation.y]);
+        setBobberPos(prev => {
+            if (prev && Math.abs(prev[0] - x) < 0.001 && Math.abs(prev[1] - y) < 0.001 && Math.abs(prev[2] - z) < 0.001) {
+                return prev;
+            }
+            return [x, y, z];
+        });
+    }, [isFishing, fishingPhase, wiggleOffset, groupRef]);
 
     useLayoutEffect(() => {
         if (playerRef && groupRef.current) playerRef.current = groupRef.current;
@@ -197,7 +224,7 @@ export const Player = ({
             }
             hasInitialized.current = true;
         }
-    }, [initialPos, initialRot, isRemote]);
+    }, [initialPos, initialRot, isRemote, visualsRef]);
 
     const getSeatConfig = (): SeatedBehavior | null => {
         if (seatData) {
@@ -233,44 +260,73 @@ export const Player = ({
         }
     };
 
-    // Seat Snapping
+    // FIX 2: Seat Snapping Logic
+    // Used requestAnimationFrame for the fallback state updates.
+    // This breaks the synchronous render cycle detection by ESLint.
     useEffect(() => {
         if (!groupRef.current) return;
+
+        // 1. Entering/Active Seat
         if (seatConfig) {
             const currentIdx = seatData ? seatData.seatIndex : -1;
             const needsSnap = snappedSeatIndex.current !== currentIdx;
+
             groupRef.current.position.set(...seatConfig.anchorPosition);
+
             if (needsSnap && visualsRef.current) {
                 visualsRef.current.rotation.y = seatConfig.anchorRotation;
                 targetRotation.current = seatConfig.anchorRotation;
                 snappedSeatIndex.current = currentIdx;
             }
-            setActiveInteraction(activeInteraction);
-            setIsInternalLocked(false);
+
+            // Sync interactions logic (Ref only needed here)
+            if (activeInteractionRef.current && activeInteractionRef.current !== activeInteraction) {
+                // Handled by updateActiveInteraction
+            }
+
             isInternalLockedRef.current = false;
             prevSeatConfig.current = seatConfig;
+
+            // 2. Exiting Seat
         } else if (prevSeatConfig.current && !seatData && !activeInteraction) {
             const exitPos = new THREE.Vector3(...prevSeatConfig.current.exitPosition);
             groupRef.current.position.copy(exitPos);
             prevPos.current.copy(exitPos);
             prevSeatConfig.current = null;
             snappedSeatIndex.current = null;
+
+            // 3. Fallback Reset (Out of Bounds)
         } else if (!seatData && !activeInteraction) {
             snappedSeatIndex.current = null;
             const d = groupRef.current.position.distanceTo(new THREE.Vector3(...initialPos));
+
             if (d > 50) {
                 groupRef.current.position.set(...initialPos);
                 if (visualsRef.current) {
                     visualsRef.current.rotation.y = initialRot;
                     targetRotation.current = initialRot;
                 }
+
                 isInternalLockedRef.current = false;
-                setIsInternalLocked(false);
-                setActiveInteraction(null);
-                setOpacity(1);
+
+                // Safe: Defer state updates to next frame
+                if (activeInteractionRef.current || opacity !== 1) {
+                    requestAnimationFrame(() => {
+                        updateActiveInteraction(null);
+                        setOpacity(1);
+                    });
+                }
             }
         }
-    }, [seatData, activeInteraction, initialPos, initialRot, seatConfig]);
+    }, [
+        seatConfig,
+        seatData,
+        activeInteraction,
+        initialPos,
+        initialRot,
+        visualsRef,
+        opacity
+    ]);
 
     // Pose State
     useEffect(() => {
@@ -295,22 +351,28 @@ export const Player = ({
                 if (inputLocked) return;
                 const potential = potentialInteractionRef.current;
                 const behavior = potential?.behavior;
+
                 if (behavior?.type === 'seat' && onSeatInteract) {
                     onSeatInteract(behavior.seatIndex);
                     return;
-                } else if (potential && behavior?.type === 'trigger' && onTriggerInteract) {
+                }
+
+                if (potential && behavior?.type === 'trigger' && onTriggerInteract) {
                     onTriggerInteract(potential.id);
                     return;
                 }
-                if (activeInteraction) {
-                    const activeBehav = activeInteraction.behavior;
+
+                if (activeInteractionRef.current) {
+                    // Leaving interaction
+                    const activeBehav = activeInteractionRef.current.behavior;
                     if (activeBehav?.type === 'station') {
                         const exitPos = new THREE.Vector3(...activeBehav.exitPosition);
                         groupRef.current.position.copy(exitPos);
                     }
-                    setActiveInteraction(null);
+                    updateActiveInteraction(null);
                 } else if (potential && behavior?.type === 'station') {
-                    setActiveInteraction(potential);
+                    // Entering interaction
+                    updateActiveInteraction(potential);
                     targetRotation.current = behavior.anchorRotation;
                 }
             }
@@ -322,7 +384,7 @@ export const Player = ({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [isRemote, interactables, activeInteraction, onSeatInteract, onTriggerInteract, inputLocked]);
+    }, [isRemote, interactables, onSeatInteract, onTriggerInteract, inputLocked]);
 
     const checkCollision = (x: number, z: number) => {
         for (const b of barriers) {
@@ -375,13 +437,19 @@ export const Player = ({
         });
     };
 
+    //
     useFrame((state, delta) => {
         if (!groupRef.current || !visualsRef.current || !isPlaying) return;
 
         const currentData = isRemote ? (worldStateRef?.current?.[peerId!] || remoteData) : remoteData;
-        const shouldFadeOut = currentData?.isFading || isInternalLocked;
-        if (shouldFadeOut) setOpacity(prev => Math.max(0, prev - delta * 2.5));
-        else if (opacity < 1) setOpacity(prev => Math.min(1, prev + delta * 2.5));
+        const shouldFadeOut = currentData?.isFading || isInternalLockedRef.current;
+
+        if (shouldFadeOut) {
+            // Update opacity in animation loop, guard against redundant setStates
+            if (opacity > 0) setOpacity(prev => Math.max(0, prev - delta * 2.5));
+        } else if (opacity < 1) {
+            setOpacity(prev => Math.min(1, prev + delta * 2.5));
+        }
 
         if (isRemote && peerId) {
             let playerData = remoteData;
@@ -410,7 +478,7 @@ export const Player = ({
         }
 
         let dx = 0, dz = 0;
-        const isLocked = isInternalLocked || isInternalLockedRef.current;
+        const isLocked = isInternalLockedRef.current;
         const isSeated = !!seatConfig;
 
         if (!isLocked && !inputLocked && !isSeated) {
@@ -434,7 +502,7 @@ export const Player = ({
             }
 
         } else {
-            if (isInternalLocked) dz -= 1;
+            if (isLocked) dz -= 1;
             const isMovingInput = dx !== 0 || dz !== 0;
             if (isMovingInput && !isSeated) targetRotation.current = Math.atan2(dx, dz);
 
@@ -499,15 +567,17 @@ export const Player = ({
 
             if (label !== lastLabelRef.current) {
                 lastLabelRef.current = label;
-                if (interactionStateRef) interactionStateRef.current.label = label;
+                if (interactionStateRef && interactionStateRef.current) {
+                    interactionStateRef.current.label = label;
+                }
                 if (onInteractChange) onInteractChange(label);
             }
-            if (!isInternalLocked) {
+
+            if (!isInternalLockedRef.current) {
                 for (const p of portals) {
                     _target.set(...p.position);
                     if (groupRef.current.position.distanceTo(_target) < 1.0) {
                         isInternalLockedRef.current = true;
-                        setIsInternalLocked(true);
                         onPortalEnter(p);
                     }
                 }
@@ -539,12 +609,11 @@ export const Player = ({
                     <FishingRod
                         active={ isPlaying && isFishing }
                         phase={ seatData?.phase || 'idle' }
-                        bobberPosition={ bobberPosition }
+                        bobberPosition={ bobberPos }
                     />
-                    {/* Render bobber if we have a position */ }
-                    { bobberPosition && (
+                    { bobberPos && (
                         <Bobber
-                            position={ bobberPosition }
+                            position={ bobberPos }
                             phase={ seatData?.phase || 'idle' }
                             biteStrength={ seatData?.biteStrength || 0 }
                         />

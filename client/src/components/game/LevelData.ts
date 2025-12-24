@@ -1,5 +1,8 @@
-import type { LevelData, Barrier } from './GameConfig';
+import type { LevelData, Barrier, Interactable } from './GameConfig';
 
+/**
+ * Helper to create collision barriers from center point and dimensions.
+ */
 const createBarrier = (x: number, z: number, width: number, depth: number): Barrier => {
     const halfW = width / 2;
     const halfD = depth / 2;
@@ -8,6 +11,33 @@ const createBarrier = (x: number, z: number, width: number, depth: number): Barr
         z: [z - halfD, z + halfD]
     };
 };
+
+/**
+ * Helper to generate consistent Blackjack seat interactables.
+ */
+const createBJSeat = (
+    index: number,
+    position: [number, number, number],
+    anchorRotation: number,
+    anchorPosition: [number, number, number],
+    exitPosition: [number, number, number],
+    interactionRadius: number = 1.2
+): Interactable => ({
+    id: `bj-seat-${ index }`,
+    type: 'chair-bj',
+    label: `Seat ${ index + 1 }`,
+    position,
+    interactionRadius,
+    rotation: [0, anchorRotation, 0],
+    behavior: {
+        type: 'seat',
+        seatIndex: index,
+        activity: 'blackjack',
+        anchorPosition,
+        anchorRotation,
+        exitPosition
+    }
+});
 
 export const LEVELS: Record<string, LevelData> = {
     bar: {
@@ -34,61 +64,16 @@ export const LEVELS: Record<string, LevelData> = {
             spawnRotation: 0
         }],
         interactables: [
-            {
-                id: 'bj-seat-0', type: 'chair-bj', label: 'Seat 1', position: [-1.0, 0, 2.5], interactionRadius: 1.4, rotation: [0, Math.PI / 2, 0],
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 0,
-                    activity: 'blackjack',
-                    anchorPosition: [-0.8, 0.3, 2.6],
-                    anchorRotation: Math.PI / 2,
-                    exitPosition: [-1.8, 0, 2.5]
-                }
-            },
-            {
-                id: 'bj-seat-1', type: 'chair-bj', label: 'Seat 2', position: [1.0, 0, 4.5], interactionRadius: 1.2, rotation: [0, Math.PI, 0],
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 1,
-                    activity: 'blackjack',
-                    anchorPosition: [1.0, 0.05, 4.3],
-                    anchorRotation: Math.PI,
-                    exitPosition: [1.0, 0, 5.5]
-                }
-            },
-            {
-                id: 'bj-seat-2', type: 'chair-bj', label: 'Seat 3', position: [3.0, 0, 4.5], interactionRadius: 1.2, rotation: [0, Math.PI, 0],
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 2,
-                    activity: 'blackjack',
-                    anchorPosition: [3.0, 0.05, 4.3],
-                    anchorRotation: Math.PI,
-                    exitPosition: [3.0, 0, 5.5]
-                }
-            },
-            {
-                id: 'bj-seat-3', type: 'chair-bj', label: 'Seat 4', position: [5.0, 0, 4.5], interactionRadius: 1.2, rotation: [0, Math.PI, 0],
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 3,
-                    activity: 'blackjack',
-                    anchorPosition: [4.9, 0.05, 4.3],
-                    anchorRotation: Math.PI,
-                    exitPosition: [5.0, 0, 5.5]
-                }
-            },
-            {
-                id: 'bj-seat-4', type: 'chair-bj', label: 'Seat 5', position: [7.0, 0, 2.5], interactionRadius: 1.4, rotation: [0, -Math.PI / 2, 0],
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 4,
-                    activity: 'blackjack',
-                    anchorPosition: [6.8, 0.3, 2.6],
-                    anchorRotation: -Math.PI / 2,
-                    exitPosition: [7.8, 0, 2.5]
-                }
-            },
+            // Left Seat (Side)
+            createBJSeat(0, [-1.0, 0, 2.5], Math.PI / 2, [-0.8, 0.3, 2.6], [-1.8, 0, 2.5], 1.4),
+            // Middle Seats (Facing Table)
+            createBJSeat(1, [1.0, 0, 4.5], Math.PI, [1.0, 0.05, 4.3], [1.0, 0, 5.5]),
+            createBJSeat(2, [3.0, 0, 4.5], Math.PI, [3.0, 0.05, 4.3], [3.0, 0, 5.5]),
+            createBJSeat(3, [5.0, 0, 4.5], Math.PI, [4.9, 0.05, 4.3], [5.0, 0, 5.5]),
+            // Right Seat (Side)
+            createBJSeat(4, [7.0, 0, 2.5], -Math.PI / 2, [6.8, 0.3, 2.6], [7.8, 0, 2.5], 1.4),
+
+            // Bar Stools
             {
                 id: 'stool-1', type: 'stool', label: 'Sit', position: [-6, 0, -0.6], interactionRadius: 1.5,
                 behavior: {
@@ -123,7 +108,6 @@ export const LEVELS: Record<string, LevelData> = {
                 }
             }
         ],
-        // Extracted from original JSX
         staticProps: [
             {
                 id: 'npc-bar',
@@ -145,8 +129,7 @@ export const LEVELS: Record<string, LevelData> = {
             createBarrier(10.8, -10, 7.7, 1.0),
             createBarrier(-5.0, -8.0, 3, 2.0),
             createBarrier(2, -9.5, 2.8, 1),
-            // Lake Barrier (Visual only unless we add logic)
-            createBarrier(0, 5, 40, 6)
+            createBarrier(0, 5, 40, 6) // Lake Visual Barrier
         ],
         portals: [{
             position: [6, 0, -9.3],
@@ -206,8 +189,7 @@ export const LEVELS: Record<string, LevelData> = {
                 size: 0.6
             },
             { id: 'npc-smoke', type: 'npc-smoker', label: '', position: [1.3, 0.45, -9], interactionRadius: 0 },
-
-            // Plants along the water edge
+            // Foliage
             { id: 'reed-1', type: 'reed', label: '', position: [-9, 0, 3.5], interactionRadius: 0 },
             { id: 'reed-2', type: 'reed', label: '', position: [-7.5, 0, 2.1], interactionRadius: 0 },
             { id: 'reed-3', type: 'reed', label: '', position: [-3, 0, 1.1], interactionRadius: 0 },

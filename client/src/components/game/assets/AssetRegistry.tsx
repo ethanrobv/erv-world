@@ -6,7 +6,7 @@ import * as Chars from './Characters';
 type PropComponent = React.ComponentType<{
     position: [number, number, number];
     rotation?: [number, number, number];
-    [key: string]: any;
+    [key: string]: unknown;
 }>;
 
 export const ASSET_MAP: Record<string, PropComponent> = {
