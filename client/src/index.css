@@ -20,6 +20,29 @@
     --color-game-success: var(--game-success);
     --color-game-accent: var(--game-accent);
 
+    /* Game Assets: General */
+    --color-game-sky: var(--game-sky);
+
+    /* Game Assets: Surfaces (Floors/Walls) */
+    --color-game-floor-wood: var(--game-floor-wood);
+    --color-game-floor-road: var(--game-floor-road);
+    --color-game-wall-brick: var(--game-wall-brick);
+    --color-game-water: var(--game-water);
+
+    /* Game Assets: Objects (Props/Furniture) */
+    --color-game-object-wood: var(--game-object-wood);
+    --color-game-object-metal: var(--game-object-metal);
+
+    /* Game Assets: Fishing */
+    --color-game-fishing-rod: var(--game-fishing-rod);
+    --color-game-fishing-bobber-top: var(--game-fishing-bobber-top);
+    --color-game-fishing-bobber-bottom: var(--game-fishing-bobber-bottom);
+
+    --color-game-casino-chip-10: var(--game-casino-chip-10);
+    --color-game-casino-chip-25: var(--game-casino-chip-25);
+    --color-game-casino-chip-50: var(--game-casino-chip-50);
+    --color-game-casino-chip-100: var(--game-casino-chip-100);
+
     /* Synth Keys */
     --color-key-white-bg: var(--key-white-bg);
     --color-key-white-border: var(--key-white-border);
@@ -29,12 +52,8 @@
     --color-key-black-active: var(--key-black-active);
 }
 
-/* -------------------------------------------------------------------------- */
-/* THEME DEFINITIONS                                                          */
-/* -------------------------------------------------------------------------- */
-
 :root {
-    /* --- LIGHT THEME (Warmer, Cozy Bar) --- */
+    /* LIGHT THEME */
     --bg-page: #fdfaf3;
     --bg-surface: #ffffff;
     --bg-surface-highlight: #f8f8f2;
@@ -52,33 +71,55 @@
     --key-black-border: #000000;
     --key-black-active: #3f3f46;
 
-    /* Game Assets: Environment */
-    --game-wood: #a16207; /* Golden Oak */
-    --game-metal: #71717a; /* Steel */
-    --game-grass: #65a30d;
+    /* Game Assets */
     --game-sky: #7dd3fc;
     --game-accent: #f59e0b;
     --game-danger: #ef4444;
     --game-success: #22c55e;
+    --game-grass: #65a30d;
+
+    --game-casino-chip-10: #3b82f6;
+    --game-casino-chip-25: #22c55e;
+    --game-casino-chip-50: #ef4444;
+    --game-casino-chip-100: #18181b;
+
+    /* Fishing Assets (Light) */
+    --game-fishing-rod: #7c2d12;
+    --game-fishing-bobber-top: #dc2626;
+    --game-fishing-bobber-bottom: #f8fafc;
+
+    /* Surfaces */
+    --game-floor-wood: #78350f;
+    --game-floor-road: #3f3f46;
+    --game-wall-brick: #9f4636;
+    --game-brick-base: #9f4636;
+    --game-brick-mortar: #d6d3d1;
+    --game-water: #3b82f6;
+
+
+    /* Objects */
+    --game-object-wood: #b45309;
+    --game-object-metal: #52525b;
+
+    /* Characters (Light) */
+    --player-head: #e0ac69;
+    --player-torso: #f4f4f5;
+    --player-legs: #18181b;
+    --npc-vest: #27272a;
+    --npc-apron: #2563eb;
+    --npc-shirt-smoker: #52525b;
 
     /* Lighting */
-    --game-light-warm: #ffaa00; /* Richer Amber */
+    --game-light-warm: #ffaa00;
     --game-light-cool: #e0f2fe;
     --game-neon-main: #db2777;
     --game-neon-alt: #2563eb;
-    --game-sun-color: #fff7ed; /* Warm Daylight */
-    --game-window-glass: #dbeafe; /* Bright Day Glass */
-
-    /* Player Details */
-    --player-torso: #2563eb;
-    --player-legs: #1e293b;
-    --player-head: #fdba74; /* Warm Skin Tone */
-    --game-shirt-smoker: #475569;
-    --game-pants: #0f172a;
+    --game-sun-color: #fff7ed;
+    --game-window-glass: #dbeafe;
 }
 
 :root[data-theme='dark'] {
-    /* --- DARK THEME (Late Night Lounge) --- */
+    /* DARK THEME */
     --bg-page: #0c0c0e;
     --bg-surface: #18181b;
     --bg-surface-highlight: #27272a;
@@ -96,29 +137,52 @@
     --key-black-border: #000000;
     --key-black-active: #18181b;
 
-    /* Game Assets: Environment */
-    --game-wood: #452e13; /* Dark Walnut */
-    --game-metal: #27272a; /* Iron */
-    --game-grass: #365314;
+    /* Game Assets */
     --game-sky: #0c4a6e;
     --game-accent: #fbbf24;
+    --game-grass: #365314;
+
+    --game-casino-chip-10: #60a5fa;
+    --game-casino-chip-25: #4ade80;
+    --game-casino-chip-50: #f87171;
+    --game-casino-chip-100: #27272a;
+
+    /* Fishing Assets (Dark) */
+    --game-fishing-rod: #d97706;
+    --game-fishing-bobber-top: #ef4444;
+    --game-fishing-bobber-bottom: #f3f4f6;
+
+    /* Surfaces */
+    --game-floor-wood: #2e1a05;
+    --game-floor-road: #18181b;
+    --game-wall-brick: #451a03;
+    --game-brick-base: #4a2c2a;
+    --game-brick-mortar: #18181b;
+    --game-water: #1e3a8a;
+
+    /* Objects */
+    --game-object-wood: #713f12;
+    --game-object-metal: #3f3f46;
+
+    /* Characters (Dark) */
+    --player-head: #e0ac69;
+    --player-torso: #fafafa;
+    --player-legs: #18181b;
+    --npc-vest: #18181b;
+    --npc-apron: #3b82f6;
+    --npc-shirt-smoker: #52525b;
 
     /* Lighting */
     --game-light-warm: #f59e0b;
     --game-light-cool: #0ea5e9;
     --game-neon-main: #d946ef;
     --game-neon-alt: #3b82f6;
-    --game-sun-color: #000000; /* Sun is OFF at night */
-    --game-window-glass: #0f172a; /* Dark Night Glass */
-
-    /* Player Details */
-    --player-torso: #3b82f6;
-    --player-legs: #0f172a;
-    --player-head: #ffedd5;
+    --game-sun-color: #000000;
+    --game-window-glass: #0f172a;
 }
 
 :root[data-theme='terminal'] {
-    /* --- TERMINAL THEME (Retro Phosphor) --- */
+    /* TERMINAL THEME */
     --bg-page: #020802;
     --bg-surface: #051105;
     --bg-surface-highlight: #0a220a;
@@ -128,7 +192,7 @@
     --brand-primary: #4ade80;
     --brand-primary-fg: #020802;
 
-    /* Synth Keys (Terminal) */
+    /* Synth Keys */
     --key-white-bg: #051105;
     --key-white-border: #22c55e;
     --key-white-active: #0a220a;
@@ -137,11 +201,39 @@
     --key-black-active: #14532d;
 
     /* Game Assets */
-    --game-wood: #064e3b;
-    --game-metal: #022c22;
-    --game-grass: #166534;
     --game-sky: #052e16;
     --game-accent: #86efac;
+    --game-grass: #166534;
+
+    --game-casino-chip-10: #14532d;
+    --game-casino-chip-25: #15803d;
+    --game-casino-chip-50: #16a34a;
+    --game-casino-chip-100: #4ade80;
+
+    /* Fishing Assets (Terminal) */
+    --game-fishing-rod: #15803d;
+    --game-fishing-bobber-top: #4ade80;
+    --game-fishing-bobber-bottom: #020802;
+
+    /* Surfaces */
+    --game-floor-wood: #022c22;
+    --game-floor-road: #020802;
+    --game-wall-brick: #064e3b;
+    --game-brick-base: #064e3b;
+    --game-brick-mortar: #22c55e;
+    --game-water: #065f46;
+
+    /* Objects */
+    --game-object-wood: #14532d;
+    --game-object-metal: #15803d;
+
+    /* Characters (Terminal) */
+    --player-head: #22c55e;
+    --player-torso: #052e16;
+    --player-legs: #020802;
+    --npc-vest: #064e3b;
+    --npc-apron: #4ade80;
+    --npc-shirt-smoker: #14532d;
 
     /* Lighting */
     --game-light-warm: #4ade80;
@@ -153,7 +245,7 @@
 }
 
 :root[data-theme='catppuccin'] {
-    /* --- CATPPUCCIN THEME (Mocha) --- */
+    /* CATPPUCCIN THEME */
     --bg-page: #1e1e2e;
     --bg-surface: #181825;
     --bg-surface-highlight: #313244;
@@ -163,7 +255,7 @@
     --brand-primary: #cba6f7;
     --brand-primary-fg: #11111b;
 
-    /* Synth Keys (Catppuccin) */
+    /* Synth Keys */
     --key-white-bg: #313244;
     --key-white-border: #45475a;
     --key-white-active: #45475a;
@@ -172,13 +264,39 @@
     --key-black-active: #1e1e2e;
 
     /* Game Assets */
-    --game-wood: #fab387;
-    --game-metal: #585b70;
-    --game-grass: #a6e3a1;
     --game-sky: #89dceb;
     --game-accent: #f9e2af;
-    --game-danger: #f38ba8;
-    --game-success: #94e2d5;
+    --game-grass: #a6e3a1;
+
+    --game-casino-chip-10: #89b4fa;
+    --game-casino-chip-25: #a6e3a1;
+    --game-casino-chip-50: #f38ba8;
+    --game-casino-chip-100: #45475a;
+
+    /* Fishing Assets (Catppuccin) */
+    --game-fishing-rod: #fab387;
+    --game-fishing-bobber-top: #f38ba8;
+    --game-fishing-bobber-bottom: #b4befe;
+
+    /* Surfaces */
+    --game-floor-wood: #eba0ac;
+    --game-floor-road: #181825;
+    --game-wall-brick: #f38ba8;
+    --game-brick-base: #f38ba8;
+    --game-brick-mortar: #45475a;
+    --game-water: #89b4fa;
+
+    /* Objects */
+    --game-object-wood: #fab387;
+    --game-object-metal: #585b70;
+
+    /* Characters (Catppuccin) */
+    --player-head: #f5e0dc;
+    --player-torso: #b4befe;
+    --player-legs: #45475a;
+    --npc-vest: #313244;
+    --npc-apron: #cba6f7;
+    --npc-shirt-smoker: #9399b2;
 
     /* Lighting */
     --game-light-warm: #f9e2af;
@@ -187,15 +305,10 @@
     --game-neon-alt: #f5c2e7;
     --game-sun-color: #000000;
     --game-window-glass: #11111b;
-
-    /* Player Details */
-    --player-torso: #89b4fa;
-    --player-legs: #313244;
-    --player-head: #f5e0dc;
 }
 
 :root[data-theme='contrast'] {
-    /* --- HIGH CONTRAST (Accessibility/Hyper) --- */
+    /* HIGH CONTRAST */
     --bg-page: #000000;
     --bg-surface: #000000;
     --bg-surface-highlight: #1a1a1a;
@@ -205,7 +318,7 @@
     --brand-primary: #00ffff;
     --brand-primary-fg: #000000;
 
-    /* Synth Keys (Contrast) */
+    /* Synth Keys */
     --key-white-bg: #000000;
     --key-white-border: #ffffff;
     --key-white-active: #333333;
@@ -214,11 +327,39 @@
     --key-black-active: #ffffff;
 
     /* Game Assets */
-    --game-wood: #ff00ff;
-    --game-metal: #ffffff;
-    --game-grass: #00ff00;
     --game-sky: #0000ff;
     --game-accent: #ffff00;
+    --game-grass: #00ff00;
+
+    --game-casino-chip-10: #00ffff;
+    --game-casino-chip-25: #00ff00;
+    --game-casino-chip-50: #ff00ff;
+    --game-casino-chip-100: #ffff00;
+
+    /* Fishing Assets (Contrast) */
+    --game-fishing-rod: #ffff00;
+    --game-fishing-bobber-top: #ff0000;
+    --game-fishing-bobber-bottom: #ffffff;
+
+    /* Surfaces */
+    --game-floor-wood: #ff00ff;
+    --game-floor-road: #333333;
+    --game-wall-brick: #ff0000;
+    --game-brick-base: #ff0000;
+    --game-brick-mortar: #ffffff;
+    --game-water: #0000ff;
+
+    /* Objects */
+    --game-object-wood: #0000ff;
+    --game-object-metal: #ffffff;
+
+    /* Characters (Contrast) */
+    --player-head: #ffff00;
+    --player-torso: #00ffff;
+    --player-legs: #ffffff;
+    --npc-vest: #333333;
+    --npc-apron: #ff00ff;
+    --npc-shirt-smoker: #cccccc;
 
     /* Lighting */
     --game-light-warm: #ffff00;

@@ -1,11 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { Peer } from 'peerjs';
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-
-/* -------------------------------------------------------------------------- */
-
 /**
  * Defines the shape of the Network Context.
  * @property peer - The current PeerJS instance, or null if not initialized.
@@ -16,19 +11,11 @@ export interface NetworkContextType {
     peerId: string | null;
 }
 
-/* -------------------------------------------------------------------------- */
-/* CONTEXT CREATION                                                           */
-/* -------------------------------------------------------------------------- */
-
 /**
  * Context for sharing PeerJS network state across the application.
  * Initialized as undefined to ensure usage strictly within the Provider.
  */
 export const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
-
-/* -------------------------------------------------------------------------- */
-/* CUSTOM HOOKS                                                               */
-/* -------------------------------------------------------------------------- */
 
 /**
  * Custom hook to access the PeerJS network state.

@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { useSynth } from '../hooks/useSynth';
 
-/* -------------------------------------------------------------------------- */
-/* TYPES & CONSTANTS                                                          */
-/* -------------------------------------------------------------------------- */
-
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 
 // 2-octave scale (24 semitones)
@@ -17,15 +13,19 @@ const THEME_CLASSES = {
     textMuted: 'text-xs text-text-muted'
 };
 
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * Renders an interactive virtual piano synthesizer.
+ * Allows users to play notes across two octaves and change the oscillator waveform.
+ */
 export default function Synth() {
     const [toneType, setToneType] = useState<OscillatorType>('sine');
     const [octave, setOctave] = useState(3);
     const { playTone } = useSynth();
 
+    /**
+     * Calculates the frequency (Hz) for a specific note index based on the current octave.
+     * Uses the standard MIDI tuning formula relative to A4 (440Hz).
+     */
     const getFreq = (index: number) => {
         const baseNote = (octave + 1) * 12; // MIDI note calculation
         const midiNote = baseNote + index;
@@ -36,6 +36,9 @@ export default function Synth() {
         playTone(getFreq(index), toneType);
     };
 
+    /**
+     * Cycles through available oscillator types (sine -> square -> triangle -> sawtooth).
+     */
     const cycleWaveform = () => {
         const types: OscillatorType[] = ['sine', 'square', 'triangle', 'sawtooth'];
         const nextIndex = (types.indexOf(toneType) + 1) % types.length;
@@ -86,20 +89,17 @@ export default function Synth() {
                         const hasSharp = nextNote && nextNote.includes('#');
 
                         const isFirst = i === 0;
-                        const isLast = i === (NOTES.length * 2) - 1; // Last natural note roughly
+                        const isLast = i === (NOTES.length * 2) - 1;
 
                         return (
                             <div
                                 key={ `${ note }-${ i }` }
-                                // Z-Index Stack: Earlier keys (C) render ON TOP of later keys (D).
-                                // This ensures the black key attached to C sits above D's border.
                                 style={ { zIndex: DOUBLE_SCALE.length - i } }
                                 className={ `relative flex w-14 h-48 shrink-0 flex-col border-t ${ isFirst ? 'border-l' : '' } ${ isLast ? 'border-r' : '' }` }
                             >
                                 {/* White Key */ }
                                 <button
                                     onMouseDown={ () => handleNoteClick(i) }
-                                    // Use the new theme classes which now have opaque backgrounds
                                     className='h-full w-full rounded-b-sm transition-colors duration-200 cursor-pointer border bg-key-white-bg border-key-white-border active:bg-key-white-active hover:opacity-90'
                                 />
 
@@ -111,7 +111,6 @@ export default function Synth() {
                                             handleNoteClick(i + 1);
                                         } }
                                         style={ { width: '60%' } }
-                                        // Use the new theme classes (bg-key-black-bg is now solid)
                                         className='absolute left-full top-0 z-10 -translate-x-1/2 h-3/5 rounded-b-sm shadow-md transition-colors duration-200 cursor-pointer border bg-key-black-bg border-key-black-border active:bg-key-black-active'
                                     />
                                 ) }

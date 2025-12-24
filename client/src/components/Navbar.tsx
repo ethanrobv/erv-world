@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Logo from './Logo';
 import { useWidgets } from '../context/WidgetContext';
 
-/* -------------------------------------------------------------------------- */
-/* TYPES & HELPERS                                                            */
-/* -------------------------------------------------------------------------- */
-
 type Theme = 'light' | 'dark' | 'contrast' | 'terminal' | 'catppuccin';
 
+/**
+ * Determines the initial theme based on local storage or system preference.
+ * Fallback is 'light'.
+ */
 const getInitialTheme = (): Theme => {
     if (typeof window === 'undefined') return 'light';
     const stored = localStorage.getItem('theme') as Theme | null;
@@ -15,31 +15,37 @@ const getInitialTheme = (): Theme => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
-/* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                             */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * The primary navigation bar for the application.
+ * Handles:
+ * 1. Global Theme toggling (Light/Dark/etc).
+ * 2. Widget Toolbox toggling (Games, Synths).
+ * 3. Responsive Mobile Menu state.
+ */
 export default function Navbar() {
-    // State
     const [theme, setTheme] = useState<Theme>(getInitialTheme);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isWidgetsOpen, setIsWidgetsOpen] = useState(false);
 
-    // Refs & Context
     const widgetDropdownRef = useRef<HTMLDivElement>(null);
     const { toggleWidget, isWidgetOpen } = useWidgets();
 
+    // Theme Effect
+    // Syncs the React state with the DOM (html tag) classes and attributes
+    // to trigger Tailwind dark mode and CSS variable swaps.
     useEffect(() => {
         const root = document.documentElement;
-        // Clean up previous classes
+
+        // Reset state
         root.classList.remove('dark');
         root.removeAttribute('data-theme');
 
+        // Apply new state
         if (theme === 'dark') {
             root.classList.add('dark');
             root.setAttribute('data-theme', 'dark');
         } else if (theme === 'contrast') {
-            root.classList.add('dark');
+            root.classList.add('dark'); // Inherits dark mode base, adds high contrast vars
             root.setAttribute('data-theme', 'contrast');
         } else if (theme === 'terminal') {
             root.classList.add('dark');
@@ -51,8 +57,10 @@ export default function Navbar() {
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+    // Click Outside Handler
+    // Closes the widget dropdown when clicking elsewhere on the page.
     useEffect(() => {
-        const handleClickOutside = (event: globalThis.MouseEvent) => {
+        const handleClickOutside = (event: MouseEvent) => {
             if (widgetDropdownRef.current && !widgetDropdownRef.current.contains(event.target as Node)) {
                 setIsWidgetsOpen(false);
             }
@@ -161,7 +169,7 @@ export default function Navbar() {
                 </div>
             </div>
 
-            {/* Mobile Menu */ }
+            {/* Mobile Menu Overlay */ }
             { isMobileMenuOpen && (
                 <div className='border-b border-border-base bg-page px-6 py-4 md:hidden'>
                     <div className='flex flex-col gap-4'>
@@ -175,10 +183,9 @@ export default function Navbar() {
     );
 }
 
-/* -------------------------------------------------------------------------- */
-/* SUB-COMPONENTS                                                             */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * A selectable card component used inside the Widget dropdown.
+ */
 const WidgetCard = ({ label, isActive, onClick, icon }: {
     label: string;
     isActive: boolean;
@@ -199,10 +206,6 @@ const WidgetCard = ({ label, isActive, onClick, icon }: {
         <span className='text-xs font-medium'>{ label }</span>
     </button>
 );
-
-/* -------------------------------------------------------------------------- */
-/* ICONS                                                                      */
-/* -------------------------------------------------------------------------- */
 
 const SunIcon = ({ className }: { className?: string }) => (
     <svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' strokeWidth={ 1.5 } stroke='currentColor'

@@ -2,17 +2,14 @@ import { useEffect, useState, useRef, useMemo, type ReactNode } from 'react';
 import { Peer } from 'peerjs';
 import { NetworkContext } from '../context/NetworkContext';
 
+/**
+ * A Context Provider that initializes and manages the local PeerJS instance.
+ * It handles the lifecycle of the Peer connection (creation, ID assignment, destruction)
+ * and exposes the Peer instance to the rest of the application via `useNetwork`.
+ */
 export function NetworkProvider({ children }: { children: ReactNode }) {
-    /* -------------------------------------------------------------------------- */
-    /* STATE & REFS                                                               */
-    /* -------------------------------------------------------------------------- */
-
     const [peerId, setPeerId] = useState<string | null>(null);
     const peerRef = useRef<Peer | null>(null);
-
-    /* -------------------------------------------------------------------------- */
-    /* LIFECYCLE: PEER INITIALIZATION                                             */
-    /* -------------------------------------------------------------------------- */
 
     useEffect(() => {
         // Initialize PeerJS
@@ -20,8 +17,6 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 
         peer.on('open', (id) => {
             console.log('My peer ID is: ' + id);
-            // This state update will trigger a re-render,
-            // allowing the context to expose the now-ready peerRef.current
             setPeerId(id);
         });
 
@@ -37,11 +32,6 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    /* -------------------------------------------------------------------------- */
-    /* PROVIDER RENDER                                                            */
-    /* -------------------------------------------------------------------------- */
-
-    // Memoize the value to prevent unnecessary re-renders in consumers
     const contextValue = useMemo(() => ({
         peer: peerRef.current,
         peerId

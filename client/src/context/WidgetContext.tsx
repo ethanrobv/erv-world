@@ -1,9 +1,5 @@
 import { createContext, useContext } from 'react';
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
-
 /**
  * specific identifiers for available widgets.
  */
@@ -28,18 +24,10 @@ export interface WidgetContextType {
     isWidgetOpen: (widget: WidgetType) => boolean;
 }
 
-/* -------------------------------------------------------------------------- */
-/* CONTEXT DEFINITION                                                         */
-/* -------------------------------------------------------------------------- */
-
 /**
  * Context for managing window/widget state across the desktop environment.
  */
 export const WidgetContext = createContext<WidgetContextType | undefined>(undefined);
-
-/* -------------------------------------------------------------------------- */
-/* CUSTOM HOOKS                                                               */
-/* -------------------------------------------------------------------------- */
 
 /**
  * Custom hook to access widget state and control methods.

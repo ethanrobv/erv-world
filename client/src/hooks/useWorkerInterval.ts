@@ -1,36 +1,30 @@
 import { useEffect, useRef } from 'react';
 
-/* -------------------------------------------------------------------------- */
-/* WORKER SOURCE                                                              */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Stringified worker script to avoid external file dependencies.
+ * Stringified worker script.
  * Uses a self-contained interval to send 'tick' messages back to the main thread.
  */
 const workerScript = `
-  self.onmessage = function(e) {
-    const { type, delay, id } = e.data;
-    if (type === 'start') {
-      const intervalId = setInterval(() => {
-        self.postMessage({ type: 'tick', id });
-      }, delay);
-      self.postMessage({ type: 'started', intervalId });
-    } else if (type === 'stop') {
-      clearInterval(e.data.intervalId);
-    }
-  };
+    self.onmessage = function(e) {
+        const { type, delay, id } = e.data;
+        if (type === 'start') {
+            const intervalId = setInterval(() => {
+                self.postMessage({ type: 'tick', id });
+            }, delay);
+            self.postMessage({ type: 'started', intervalId });
+        } else if (type === 'stop') {
+            clearInterval(e.data.intervalId);
+        }
+    };
 `;
-
-/* -------------------------------------------------------------------------- */
-/* HOOK DEFINITION                                                            */
-/* -------------------------------------------------------------------------- */
 
 /**
  * A robust alternative to setInterval that runs in a Web Worker.
- * Essential for game loops or watchdogs that must not be throttled when the tab is idled/put in background.
- * * @param callback - The function to execute on every tick.
- * @param callback - Function to call at each interval.
+ * * Standard `setInterval` is throttled by browsers (often to 1000ms) when a tab
+ * goes into the background. This breaks real-time networking features like
+ * heartbeats and watchdogs. Running the timer in a Worker prevents this throttling.
+ *
+ * @param callback - The function to execute on every tick.
  * @param delay - Delay in milliseconds. Pass null to stop the interval.
  */
 export const useWorkerInterval = (callback: () => void, delay: number | null): void => {
@@ -38,22 +32,23 @@ export const useWorkerInterval = (callback: () => void, delay: number | null): v
     const workerRef = useRef<Worker | null>(null);
     const intervalIdRef = useRef<number | null>(null);
 
-    // Remember the latest callback if it changes.
+    // Remember the latest callback if it changes to avoid restarting the worker
     useEffect(() => {
         savedCallback.current = callback;
     }, [callback]);
 
-    // Set up the worker and interval.
+
+    // Set up the worker and interval
     useEffect(() => {
         if (delay === null) return;
 
-        // 1. Create worker via Blob to avoid external file hosting issues
+        // Create worker via Blob to avoid external file hosting issues
         const blob = new Blob([workerScript], { type: 'application/javascript' });
         const workerUrl = URL.createObjectURL(blob);
         const worker = new Worker(workerUrl);
         workerRef.current = worker;
 
-        // 2. Handle messages from Worker
+        // Handle messages from Worker
         worker.onmessage = (e: MessageEvent) => {
             const { type, intervalId } = e.data;
 
@@ -64,14 +59,14 @@ export const useWorkerInterval = (callback: () => void, delay: number | null): v
             }
         };
 
-        // 3. Initialize the interval
+        // Initialize the interval
         worker.postMessage({
             type: 'start',
             delay,
             id: Date.now()
         });
 
-        // 4. Cleanup
+        // Cleanup
         return () => {
             if (intervalIdRef.current !== null) {
                 worker.postMessage({ type: 'stop', intervalId: intervalIdRef.current });

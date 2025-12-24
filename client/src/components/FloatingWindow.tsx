@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef, useLayoutEffect, type ReactNode, type MouseEvent } from 'react';
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-
-/* -------------------------------------------------------------------------- */
-
 interface FloatingWindowProps {
+    /** The text displayed in the header bar */
     title: string;
     children: ReactNode;
+    /** The CSS z-index stack order (default: 10) */
     zIndex?: number;
+    /** Callback fired when the window is clicked (used to bring to front) */
     onFocus?: () => void;
     initialPosition?: { x: number; y: number };
     initialSize?: { width: number; height: number };
+    /** Optional callback to close the window */
     onClose?: () => void;
 }
 
@@ -25,10 +24,11 @@ interface DragState {
     minY: number;
 }
 
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * A draggable, resizable, and maximizable floating window component.
+ * Can be used for in-game UI panels, tools, or content displays.
+ * constrains movement within the viewport and avoids overlapping the main navbar.
+ */
 export default function FloatingWindow({
                                            children,
                                            zIndex = 10,
@@ -38,23 +38,17 @@ export default function FloatingWindow({
                                            title,
                                            onClose
                                        }: FloatingWindowProps) {
-    // State
     const [position, setPosition] = useState(initialPosition);
     const [size, setSize] = useState(initialSize);
     const [isMaximized, setIsMaximized] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
 
-    // Refs for state tracking during events
     const preMaximizeState = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
     const actionStart = useRef<DragState | null>(null);
 
-    /* -------------------------------------------------------------------------- */
-    /* LIFECYCLE & INITIALIZATION                                                 */
-    /* -------------------------------------------------------------------------- */
-
+    // Initial placement check: Ensure window spawns below the navbar
     useLayoutEffect(() => {
-        // Adjust initial position if it overlaps with the navbar
         const navbar = document.getElementById('main-navbar');
         if (navbar) {
             const navbarHeight = navbar.offsetHeight;
@@ -64,22 +58,16 @@ export default function FloatingWindow({
         }
     }, []);
 
-    /* -------------------------------------------------------------------------- */
-    /* HANDLERS: WINDOW CONTROL                                                   */
-    /* -------------------------------------------------------------------------- */
-
     const handleToggleMaximize = (e: MouseEvent) => {
         e.stopPropagation();
 
         if (isMaximized) {
-            // Restore
             if (preMaximizeState.current) {
                 setPosition({ x: preMaximizeState.current.x, y: preMaximizeState.current.y });
                 setSize({ width: preMaximizeState.current.width, height: preMaximizeState.current.height });
             }
             setIsMaximized(false);
         } else {
-            // Maximize
             preMaximizeState.current = { ...position, ...size };
 
             const navbar = document.getElementById('main-navbar');
@@ -93,13 +81,9 @@ export default function FloatingWindow({
         }
     };
 
-    /* -------------------------------------------------------------------------- */
-    /* HANDLERS: DRAG & RESIZE INPUT                                              */
-    /* -------------------------------------------------------------------------- */
-
     const handleDragStart = (e: MouseEvent<HTMLDivElement>) => {
         if (isMaximized) return;
-        // Allow dragging only from header, ignore buttons inside header
+        // Ignore drag events initiated from header buttons
         if (e.target !== e.currentTarget && (e.target as HTMLElement).closest('button')) return;
 
         e.preventDefault();
@@ -113,8 +97,8 @@ export default function FloatingWindow({
             startY: e.clientY,
             startLeft: position.x,
             startTop: position.y,
-            startWidth: 0, // Unused for drag
-            startHeight: 0, // Unused for drag
+            startWidth: 0,
+            startHeight: 0,
             minY: currentNavbarHeight,
         };
     };
@@ -129,20 +113,16 @@ export default function FloatingWindow({
         actionStart.current = {
             startX: e.clientX,
             startY: e.clientY,
-            startLeft: 0, // Unused for resize
-            startTop: 0, // Unused for resize
+            startLeft: 0,
+            startTop: 0,
             startWidth: size.width,
             startHeight: size.height,
             minY: 0,
         };
     };
 
-    /* -------------------------------------------------------------------------- */
-    /* EFFECTS: GLOBAL EVENT LISTENERS                                            */
-    /* -------------------------------------------------------------------------- */
-
+    // Global mouse event listeners for drag/resize operations
     useEffect(() => {
-        // Native DOM Event Handler
         const handleMouseMove = (e: globalThis.MouseEvent) => {
             if (!actionStart.current) return;
 
@@ -193,10 +173,6 @@ export default function FloatingWindow({
         };
     }, [isDragging, isResizing, size.width, size.height]);
 
-    /* -------------------------------------------------------------------------- */
-    /* RENDER                                                                     */
-    /* -------------------------------------------------------------------------- */
-
     return (
         <div
             className={ `fixed flex flex-col overflow-hidden rounded-xl border border-border-base bg-surface shadow-2xl transition-colors duration-300 ${ isMaximized ? 'rounded-none border-0' : '' }` }
@@ -211,7 +187,7 @@ export default function FloatingWindow({
             } }
             onMouseDownCapture={ onFocus }
         >
-            {/* Header / Drag Handle */ }
+            {/* Header */ }
             <div
                 onMouseDown={ handleDragStart }
                 className={ `flex items-center justify-between border-b border-border-base bg-surface-highlight px-4 py-2 select-none ${ isMaximized ? 'cursor-default' : 'cursor-move' }` }
@@ -220,7 +196,6 @@ export default function FloatingWindow({
                 <span className='text-sm font-semibold text-text-main'>{ title }</span>
 
                 <div className='flex items-center gap-2'>
-                    {/* Maximize / Restore Toggle */ }
                     <button
                         onClick={ handleToggleMaximize }
                         className='flex size-6 items-center justify-center rounded-md text-text-muted hover:bg-surface hover:text-text-main transition-colors'
@@ -240,7 +215,6 @@ export default function FloatingWindow({
                         ) }
                     </button>
 
-                    {/* Close Button */ }
                     { onClose && (
                         <button
                             onClick={ onClose }
@@ -253,7 +227,7 @@ export default function FloatingWindow({
                 </div>
             </div>
 
-            {/* Window Content */ }
+            {/* Content */ }
             <div className='flex-1 overflow-auto p-4 bg-surface text-text-main'>
                 { children }
             </div>

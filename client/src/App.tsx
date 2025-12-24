@@ -7,10 +7,6 @@ import FloatingWindow from './components/FloatingWindow';
 import Synth from './components/Synth';
 import Game from './components/Game';
 
-/* -------------------------------------------------------------------------- */
-/* HELPERS & UTILS                                                            */
-/* -------------------------------------------------------------------------- */
-
 /**
  * Simple placeholder component for secondary routes.
  */
@@ -32,10 +28,6 @@ const getCenteredPos = (w: number, h: number) => {
         y: Math.max(0, (window.innerHeight - h) / 2)
     };
 };
-
-/* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                             */
-/* -------------------------------------------------------------------------- */
 
 /**
  * The root Application component.

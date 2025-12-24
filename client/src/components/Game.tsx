@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type { DataConnection } from 'peerjs';
 
 // 3D & Effects
 import { Canvas } from '@react-three/fiber';
-import { PerspectiveCamera } from '@react-three/drei';
+import { PerspectiveCamera, Preload, useProgress } from '@react-three/drei';
 import { Bloom, EffectComposer, Pixelation } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
@@ -11,29 +11,20 @@ import * as THREE from 'three';
 import { useNetwork } from '../context/NetworkContext';
 import { useGameP2P } from '../hooks/useGameP2P';
 import { useThemeColor } from '../hooks/useThemeColor';
+import { useActivity } from '../hooks/useActivity';
 
 // Config & Types
 import {
-    type BJGameState,
-    type Card,
     FADE_IN_DURATION,
     FADE_OUT_DURATION,
     type GameState,
     type PlayerPose,
     type PortalDef,
     type RemotePlayerState,
-    SCENE_DATA,
     type SceneType
 } from './game/GameConfig';
 
-// Logic
-import {
-    calculateHand,
-    createInitialState,
-    generateDeck,
-    processNextTurn,
-    resetForBetting
-} from './game/logic/Blackjack';
+import { LEVELS } from './game/LevelData';
 
 // Components
 import { AlleyLevel, BarLevel } from './game/GameLevels';
@@ -44,19 +35,29 @@ import {
     InteractionPrompt,
     MainMenu,
     NetworkIndicator,
-    PauseMenu,
+    EscOverlayMenu,
     SystemFeed,
-    TransitionOverlay
+    TransitionOverlay,
+    FishingHUD
 } from './game/ui';
-
-/* -------------------------------------------------------------------------- */
-/* MAIN GAME COMPONENT                                                        */
-/* -------------------------------------------------------------------------- */
 
 export default function Game() {
     const { peerId } = useNetwork();
+    const [, startTransition] = useTransition();
 
-    // Game State
+    // --- ASSET LOADING STATE ---
+    const { active, progress, total } = useProgress();
+    const [assetsLoaded, setAssetsLoaded] = useState(false);
+
+    useEffect(() => {
+        if (progress === 100 || (total === 0 && !active)) {
+            setAssetsLoaded(true);
+        }
+    }, [progress, total, active]);
+
+    const isReady = peerId !== null && assetsLoaded;
+
+    // Global State
     const [gameState, setGameState] = useState<GameState>('menu');
     const [currentScene, setCurrentScene] = useState<SceneType>('bar');
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -68,44 +69,38 @@ export default function Game() {
         pos: [0, 0, 0],
         rot: Math.PI
     });
-
-    // [OPTIMIZATION] Removed State-based interaction label
-    const promptRef = useRef<HTMLDivElement>(null);
-    const interactionStateRef = useRef<{ label: string | null }>({ label: null });
-
     const [playerPose, setPlayerPose] = useState<PlayerPose>('idle');
     const [playerName, setPlayerName] = useState('');
     const [money, setMoney] = useState(100);
 
-    // Object State
-    const [isFireLit, setIsFireLit] = useState(true);
-
-    // UI State
-    const [systemMessages, setSystemMessages] = useState<Array<{ id: number; text: string }>>([]);
-    const [ping, setPing] = useState<number>(0);
-
-    // Blackjack State
-    const [bjState, setBjState] = useState<BJGameState>(createInitialState());
-    const deckRef = useRef<Card[]>([]);
-
     // Refs
+    const promptRef = useRef<HTMLDivElement>(null);
+    const interactionStateRef = useRef<{ label: string | null }>({ label: null });
     const playerRef = useRef<THREE.Group>(null);
     const visualsRef = useRef<THREE.Group>(null);
-
-    // [OPTIMIZATION] Single Source of Truth for Positions
     const worldStateRef = useRef<Record<string, RemotePlayerState>>({});
     const initializedConnections = useRef<WeakSet<DataConnection>>(new WeakSet());
 
-    // Alerts Callback
+    // Alerts
+    const [systemMessages, setSystemMessages] = useState<Array<{ id: number; text: string }>>([]);
+    const alertIdRef = useRef(0);
     const addAlert = useCallback((text: string) => {
-        const id = Date.now();
+        const id = alertIdRef.current++;
         setSystemMessages(prev => [...prev, { id, text }]);
         setTimeout(() => setSystemMessages(prev => prev.filter(m => m.id !== id)), 3000);
     }, []);
 
-    // P2P Hook
+    // Network & P2P Setup
     const [remotePlayers, setRemotePlayers] = useState<Record<string, RemotePlayerState>>({});
     const [heirId, setHeirId] = useState<string | null>(null);
+    const [ping, setPing] = useState<number>(0);
+
+    // Environment
+    const [isFireLit, setIsFireLit] = useState(true);
+    const sunColor = useThemeColor('--game-sun-color') || '#fff7ed';
+    const isNight = sunColor === '#000000' || sunColor === 'rgb(0, 0, 0)';
+    const isDay = !isNight;
+    const isRaining = !isDay;
 
     const onPeerJoined = useCallback((id: string) => {
         addAlert(`Player ${ id.substring(0, 4).toUpperCase() } joined`);
@@ -115,10 +110,7 @@ export default function Game() {
         if (worldStateRef.current[id]) {
             worldStateRef.current[id].isFading = true;
             addAlert(`Player ${ id.substring(0, 4).toUpperCase() } left`);
-
-            // Force update to trigger fade out logic
             setRemotePlayers({ ...worldStateRef.current });
-
             setTimeout(() => {
                 if (worldStateRef.current[id]) {
                     const next = { ...worldStateRef.current };
@@ -136,238 +128,73 @@ export default function Game() {
         connections,
         hostConn,
         startHosting,
-        joinRoom,
-        p2pError
+        joinRoom
     } = useGameP2P(onPeerJoined, onPeerLeft, heirId);
 
-    // Host Migration
+    // --- Activity Management Hook ---
+    const {
+        activityState,
+        dispatch: dispatchActivity,
+        processAction,
+        handleRemoteUpdate
+    } = useActivity({ isHost, peerId, hostConn, connections, setMoney, money, addAlert });
+
+    const bjSeatIndex = isReady && peerId
+        ? activityState.blackjack.seats.findIndex(s => s.peerId === peerId)
+        : -1;
+
+    const fishingSeat = isReady && peerId
+        ? activityState.fishing.seats.find(s => s.peerId === peerId)
+        : null;
+
+    const isOccupied = bjSeatIndex !== -1 || !!fishingSeat;
+
+    // --- Inputs & UI visibility ---
     useEffect(() => {
-        if (isHost) {
-            const isGameActive = bjState.phase !== 'idle' && bjState.phase !== 'betting';
-            if (isGameActive && deckRef.current.length === 0) {
-                const freshDeck = generateDeck();
-                const visibleCards = new Set<string>();
-                bjState.dealerHand.forEach(c => visibleCards.add(`${ c.rank }-${ c.suit }`));
-                bjState.seats.forEach(s => s.hand.forEach(c => visibleCards.add(`${ c.rank }-${ c.suit }`)));
-                deckRef.current = freshDeck.filter(c => !visibleCards.has(`${ c.rank }-${ c.suit }`));
-                addAlert('You are now the Host. Game resumed.');
-            }
-        }
-    }, [isHost, bjState, addAlert]);
+        if (isOccupied && promptRef.current) promptRef.current.style.opacity = '0';
+    }, [isOccupied]);
 
-    const mySeatIndex = bjState.seats.findIndex(s => s.peerId === peerId);
-    const isSeated = mySeatIndex !== -1;
-
-    // --- LOGIC: UI Toggles & Input ---
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.code === 'Escape' && gameState === 'playing') {
-                setIsPaused(prev => !prev);
-            }
+            if (e.code === 'Escape' && gameState === 'playing') setIsPaused(prev => !prev);
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [gameState]);
 
-    useEffect(() => {
-        if (isSeated) {
-            if (promptRef.current) promptRef.current.style.opacity = '0';
-        }
-    }, [isSeated]);
-
-    // --- LOGIC: Blackjack State Handling ---
-    const runTurnCycle = useCallback((currentState: BJGameState) => {
-        const nextState = processNextTurn(currentState, deckRef.current);
-        if (nextState.phase === 'payout') {
-            setTimeout(() => {
-                setBjState(prev => resetForBetting(prev));
-            }, 5000);
-        }
-        return nextState;
-    }, []);
-
-    const prevPhase = useRef(bjState.phase);
-    useEffect(() => {
-        if (prevPhase.current !== 'payout' && bjState.phase === 'payout' && mySeatIndex !== -1) {
-            const seat = bjState.seats[mySeatIndex];
-            if (seat.status === 'lost' || seat.status === 'bust') {
-                addAlert(`You lost $${ seat.bet }.`);
-            } else if (seat.status === 'won' || seat.status === 'blackjack') {
-                const multiplier = seat.status === 'blackjack' ? 2.5 : 2;
-                setMoney(m => m + (seat.bet * multiplier));
-                addAlert(`You won $${ seat.bet * multiplier }!`);
-            } else if (seat.status === 'push') {
-                setMoney(m => m + seat.bet);
-                addAlert(`Push. $${ seat.bet } returned.`);
-            }
-        }
-        prevPhase.current = bjState.phase;
-    }, [bjState.phase, mySeatIndex, bjState.seats, addAlert]);
-
-    const handleLocalAction = useCallback((action: string, seatIndex: number, amount?: number, extraPayload?: any) => {
-        let cardToDeal: Card | null = null;
-        let newDeck: Card[] | null = null;
-        const currentSeat = bjState.seats[seatIndex];
-
-        if (action === 'HIT' && bjState.activeSeatIndex === seatIndex) {
-            cardToDeal = deckRef.current.pop() || null;
-        }
-
-        if (action === 'BET' && bjState.phase === 'betting') {
-            const seatedCount = bjState.seats.filter(s => s.peerId).length;
-            const readyCount = bjState.seats.filter(s => s.status === 'playing').length;
-            if (seatedCount > 0 && readyCount + 1 === seatedCount && amount) {
-                newDeck = generateDeck();
-                deckRef.current = newDeck;
-            }
-            if (seatIndex === mySeatIndex && amount) {
-                if (money >= amount) setMoney(m => m - amount);
-                else return;
-            }
-        }
-
-        if (action === 'LEAVE' && seatIndex === mySeatIndex && currentSeat.status === 'betting') {
-            setMoney(m => m + currentSeat.bet);
-        }
-
-        setBjState(prev => {
-            const seat = prev.seats[seatIndex];
-            if (!seat) return prev;
-
-            if (action === 'SIT') {
-                if (seat.status === 'empty') {
-                    const nextSeats = [...prev.seats];
-                    nextSeats[seatIndex] = {
-                        peerId: extraPayload?.playerId || peerId,
-                        hand: [],
-                        bet: 0,
-                        status: 'betting'
-                    };
-                    const nextState = { ...prev, seats: nextSeats };
-                    if (nextState.phase === 'idle') nextState.phase = 'betting';
-                    return nextState;
-                }
-                return prev;
-            }
-
-            if (action === 'LEAVE') {
-                const nextSeats = [...prev.seats];
-                nextSeats[seatIndex] = { peerId: null, hand: [], bet: 0, status: 'empty' };
-                const activeSeatedPlayers = nextSeats.filter(s => s.peerId !== null);
-                if (prev.phase === 'playing' || prev.phase === 'dealing') {
-                    addAlert(`Player forfeit ${ seat.bet }.`);
-                }
-                if (activeSeatedPlayers.length === 0) return createInitialState();
-                let nextState = { ...prev, seats: nextSeats };
-                if (prev.activeSeatIndex === seatIndex && prev.phase === 'playing') return runTurnCycle(nextState);
-                return nextState;
-            }
-
-            if (action === 'BET' && prev.phase === 'betting' && amount) {
-                const nextSeats = prev.seats.map((s, i) => i === seatIndex ? {
-                    ...s,
-                    bet: amount,
-                    status: 'playing' as const
-                } : s);
-                let nextState = { ...prev, seats: nextSeats };
-                const seatedCount = nextSeats.filter(s => s.peerId).length;
-                const readyCount = nextSeats.filter(s => s.status === 'playing').length;
-
-                if (seatedCount > 0 && readyCount === seatedCount) {
-                    nextState.phase = 'dealing';
-                    if (newDeck) deckRef.current = newDeck;
-                    else if (deckRef.current.length === 0) deckRef.current = generateDeck();
-                    nextState.seats = nextSeats.map(s => s.status === 'playing' ? {
-                        ...s,
-                        hand: [deckRef.current.pop()!, deckRef.current.pop()!]
-                    } : s);
-                    nextState.dealerHand = [deckRef.current.pop()!];
-                    nextState.phase = 'playing';
-                    let idx = 0;
-                    while (idx < nextState.seats.length && nextState.seats[idx].status !== 'playing') idx++;
-                    nextState.activeSeatIndex = idx;
-                }
-                return nextState;
-            } else if (action === 'HIT' && prev.activeSeatIndex === seatIndex) {
-                const newHand = [...seat.hand];
-                if (cardToDeal) newHand.push(cardToDeal);
-                else if (deckRef.current.length > 0) newHand.push(deckRef.current.pop()!);
-
-                const nextSeats = prev.seats.map((s, i) => i === seatIndex ? { ...s, hand: newHand } : s);
-                let nextState = { ...prev, seats: nextSeats };
-                if (calculateHand(newHand) > 21) {
-                    nextState.seats[seatIndex].status = 'bust';
-                    return runTurnCycle(nextState);
-                }
-                return nextState;
-            } else if (action === 'STAND' && prev.activeSeatIndex === seatIndex) {
-                const nextSeats = prev.seats.map((s, i) => i === seatIndex ? { ...s, status: 'stand' as const } : s);
-                return runTurnCycle({ ...prev, seats: nextSeats });
-            }
-            return prev;
-        });
-    }, [runTurnCycle, bjState, money, mySeatIndex, peerId, addAlert]);
-
-    // --- LOGIC: Interaction & Navigation ---
-    const handleInteractChange = useCallback((_label: string | null) => {
-        // Fallback or purely logic updates
-        // UI is updated directly via ref in Player loop
-    }, []);
-
-    const handlePortalEnter = useCallback((portal: PortalDef) => {
-        if (isTransitioning) return;
-        setIsTransitioning(true);
-        setIsInputLocked(true);
-        if (promptRef.current) promptRef.current.style.opacity = '0';
-        setTimeout(() => {
-            setCurrentScene(portal.targetScene);
-            setPlayerSpawn({ pos: portal.spawnPosition, rot: portal.spawnRotation });
-            setTimeout(() => setIsTransitioning(false), 100);
-            setTimeout(() => setIsInputLocked(false), FADE_IN_DURATION);
-        }, FADE_OUT_DURATION);
-    }, [isTransitioning]);
-
-    const barriers = SCENE_DATA[currentScene].barriers;
-    const portals = SCENE_DATA[currentScene].portals;
-    const interactables = SCENE_DATA[currentScene].interactables || [];
-    const isDoorOpen = isTransitioning;
-
-    // --- LOGIC: Networking ---
-
-    // 1. EXTENSIBLE HANDLERS
+    // --- Network Handlers ---
     const networkHandlers = useMemo(() => ({
         'PLAYER_UPDATE': (data: any, conn: DataConnection) => {
             const existing = worldStateRef.current[conn.peer];
             const newData = { ...existing, ...data.payload };
             worldStateRef.current[conn.peer] = newData;
             setRemotePlayers(prev => {
-                const oldData = prev[conn.peer];
-                if (!oldData || oldData.scene !== newData.scene) {
+                if (!prev[conn.peer] || prev[conn.peer].scene !== newData.scene) {
                     return { ...prev, [conn.peer]: newData };
                 }
                 return prev;
             });
         },
+        'PLAYER_SNAPSHOT': (data: any) => {
+            const { players, heirId } = data.payload;
+            worldStateRef.current = players;
+            setRemotePlayers(() => players);
+            if (heirId) setHeirId(heirId);
+        },
+        'ACTIVITY_UPDATE': (data: any) => {
+            handleRemoteUpdate(data.payload.state);
+        },
         'WORLD_SNAPSHOT': (data: any) => {
             const { players, game, heirId } = data.payload;
             worldStateRef.current = players;
-            setRemotePlayers(prev => {
-                const prevKeys = Object.keys(prev);
-                const newKeys = Object.keys(players);
-                if (prevKeys.length !== newKeys.length) return players;
-                if (!newKeys.every(k => prev.hasOwnProperty(k))) return players;
-                if (newKeys.some(key => prev[key].scene !== players[key].scene)) return players;
-                return prev;
-            });
-            setBjState(prev => {
-                if (JSON.stringify(prev) !== JSON.stringify(game)) return game;
-                return prev;
-            });
+            setRemotePlayers(players);
+            handleRemoteUpdate(game);
             setHeirId(heirId);
         },
-        'BJ_ACTION': (data: any, conn: DataConnection) => {
+        'ACTIVITY_ACTION': (data: any, conn: DataConnection) => {
             const { action, seatIndex, amount, ...extra } = data.payload;
-            handleLocalAction(action, seatIndex, amount, { ...extra, playerId: conn.peer });
+            // Bundle params correctly for composite handler
+            processAction(action, { seatIndex, amount, ...extra, playerId: conn.peer });
         },
         'HEARTBEAT': (_: any, conn: DataConnection) => {
             const existing = worldStateRef.current[conn.peer];
@@ -378,285 +205,305 @@ export default function Game() {
             const existing = worldStateRef.current[conn.peer];
             if (existing) worldStateRef.current[conn.peer] = { ...existing, lastSeen: Date.now() };
         },
-        'PONG': (data: any) => {
-            setPing(Date.now() - data.timestamp);
-        },
+        'PONG': (data: any) => setPing(Date.now() - data.timestamp),
         'GAME_EVENT': (data: any) => {
-            if (data.payload.id === 'trash-fire') setIsFireLit(data.payload.value);
-        }
-    }), [handleLocalAction]);
+            if (data.payload.id === 'trash-fire') startTransition(() => setIsFireLit(data.payload.value));
+        },
+        'SYSTEM_MESSAGE': (data: any) => addAlert(data.payload)
+    }), [addAlert, handleRemoteUpdate, processAction]);
 
-    // 2. Host Listener
+    // FIX: Use a Ref for handlers so the event listener closure always sees the latest state
+    const handlersRef = useRef(networkHandlers);
+    handlersRef.current = networkHandlers;
+
     useEffect(() => {
-        if (!isHost) return;
-        connections.forEach((conn) => {
-            if (initializedConnections.current.has(conn)) return;
-            initializedConnections.current.add(conn);
-            conn.on('data', (data: any) => {
-                const handler = networkHandlers[data.type as keyof typeof networkHandlers];
-                if (handler) handler(data, conn);
-            });
-        });
-    }, [isHost, connections, networkHandlers]);
+        if (isHost) {
+            connections.forEach((conn) => {
+                if (initializedConnections.current.has(conn)) return;
+                initializedConnections.current.add(conn);
 
-    // 3. Client Listener
-    useEffect(() => {
-        if (isHost || !hostConn) return;
-        const handleHostData = (data: any) => {
-            const handler = networkHandlers[data.type as keyof typeof networkHandlers];
-            if (handler) handler(data, hostConn);
-        };
-        hostConn.on('data', handleHostData);
-        return () => {
-            hostConn.off('data', handleHostData);
-        };
-    }, [hostConn, isHost, networkHandlers]);
-
-    // 4. Host-side Cleanup: Player Disconnect
-    useEffect(() => {
-        if (!isHost) return;
-        setBjState(prev => {
-            const activeIds = new Set(Object.keys(remotePlayers));
-            activeIds.add(peerId || '');
-            const needsUpdate = prev.seats.some(s => s.peerId && !activeIds.has(s.peerId));
-
-            if (needsUpdate) {
-                const nextSeats = prev.seats.map(s => {
-                    if (s.peerId && !activeIds.has(s.peerId)) {
-                        return { peerId: null, hand: [], bet: 0, status: 'empty' as const };
-                    }
-                    return s;
+                // Listener uses the REF, avoiding Stale Closures
+                conn.on('data', (data: any) => {
+                    const handler = handlersRef.current[data.type as keyof typeof networkHandlers];
+                    if (handler) handler(data, conn);
                 });
-
-                const activePlayers = nextSeats.filter(s => s.status !== 'empty');
-                if (activePlayers.length === 0) {
-                    return createInitialState();
-                }
-
-                let nextState = { ...prev, seats: nextSeats };
-
-                if (prev.phase === 'playing') {
-                    return runTurnCycle(nextState);
-                }
-
-                return nextState;
-            }
-            return prev;
-        });
-    }, [isHost, remotePlayers, peerId, runTurnCycle]);
-
-    // --- Error Handling & Cleanup ---
-    useEffect(() => {
-        if (p2pError) {
-            addAlert(p2pError);
-            setGameState('menu');
+            });
         }
-    }, [p2pError, addAlert]);
+        if (!isHost && hostConn) {
+            const handleHostData = (data: any) => {
+                // Client side re-binds on render, but using ref is safer here too
+                const handler = handlersRef.current[data.type as keyof typeof networkHandlers];
+                if (handler) handler(data, hostConn);
+            };
+            hostConn.on('data', handleHostData);
+            return () => {
+                hostConn.off('data', handleHostData);
+            };
+        }
+    }, [isHost, connections, hostConn]); // Removed networkHandlers from dep array to avoid churn
 
-    // --- Actions ---
-    const sendBjAction = (action: string, payload: any = {}) => {
-        const seatIdx = mySeatIndex;
-        if (isHost) handleLocalAction(action, seatIdx, payload.amount, payload);
-        else hostConn?.send({ type: 'BJ_ACTION', payload: { action, seatIndex: seatIdx, ...payload } });
-    };
+    // --- Interaction Logic ---
+    const handlePortalEnter = useCallback((portal: PortalDef) => {
+        if (isTransitioning) return;
+        startTransition(() => {
+            setIsTransitioning(true);
+            setIsInputLocked(true);
+        });
+        setTimeout(() => {
+            startTransition(() => {
+                setCurrentScene(portal.targetScene);
+                setPlayerSpawn({ pos: portal.spawnPosition, rot: portal.spawnRotation });
+            });
+            setTimeout(() => {
+                setIsTransitioning(false);
+                setIsInputLocked(false);
+            }, FADE_IN_DURATION);
+        }, FADE_OUT_DURATION);
+    }, [isTransitioning]);
 
     const handleSeatInteract = (seatIndex: number) => {
-        if (isHost) handleLocalAction('SIT', seatIndex, 0, { playerId: peerId });
-        else hostConn?.send({ type: 'BJ_ACTION', payload: { action: 'SIT', seatIndex } });
+        dispatchActivity('SIT', { seatIndex, targetActivity: 'blackjack' });
     };
 
     const handleTriggerInteract = useCallback((id: string) => {
         if (id === 'trash-fire') {
-            setIsFireLit(prev => {
-                const newVal = !prev;
-                if (isHost) connections.forEach(c => c.send({
-                    type: 'GAME_EVENT',
-                    payload: { id: 'trash-fire', value: newVal }
-                }));
-                return newVal;
+            const newVal = !isFireLit;
+            startTransition(() => setIsFireLit(newVal));
+            const msg = { type: 'GAME_EVENT', payload: { id: 'trash-fire', value: newVal } };
+            if (isHost) connections.forEach(c => c.send(msg));
+            else hostConn?.send(msg);
+        } else if (id === 'start-fishing') {
+            dispatchActivity('JOIN_FISHING', {
+                targetActivity: 'fishing',
+                env: { isDay, isRaining }
             });
         }
-    }, [isHost, connections]);
+    }, [isHost, connections, hostConn, isFireLit, dispatchActivity, isDay, isRaining]);
 
-    const handleLeaveTable = () => {
-        if (mySeatIndex === -1) return;
-        sendBjAction('LEAVE');
-    };
-
-    const handleHost = async () => {
-        await startHosting();
-        setGameState('playing');
-    };
-
-    const handleJoin = async (id: string) => {
-        try {
-            await joinRoom(id);
-            setGameState('playing');
-        } catch (e) {
-            alert('Failed to join: ' + e);
-            setGameState('menu');
+    // Action Router for UI inputs
+    const handleAction = (action: string, payload: any = {}) => {
+        if (bjSeatIndex !== -1) {
+            dispatchActivity(action, { ...payload, seatIndex: bjSeatIndex, targetActivity: 'blackjack' });
+        } else if (fishingSeat) {
+            dispatchActivity(action, { ...payload, seatIndex: -1, targetActivity: 'fishing' });
         }
     };
 
-    const handleReturnToMenu = () => {
-        sessionStorage.setItem('reopen_game', 'true');
-        window.location.reload();
+    const handleLeave = () => handleAction('LEAVE');
+
+    const handleLeaveBlackjack = () => {
+        if (bjSeatIndex !== -1 && (activityState.blackjack.phase === 'playing' || activityState.blackjack.phase === 'dealing')) {
+            addAlert(`You left an active hand. -$${ activityState.blackjack.seats[bjSeatIndex].bet }`);
+        }
+        handleLeave();
     };
 
-    const currentInteractable = SCENE_DATA[currentScene].interactables?.find(
-        (i) => i.behavior.type === 'seat' && i.behavior.seatIndex === mySeatIndex
+    const currentInteractable = LEVELS[currentScene].interactables?.find(
+        (i) => i.behavior?.type === 'seat' && i.behavior.seatIndex === bjSeatIndex
     );
 
-    const mySyncData = useMemo(() => ({
-        money: money,
-        isPaused: isPaused
-    }), [money, isPaused]);
+    const mySyncData = useMemo(() => {
+        let act = null;
+        if (bjSeatIndex !== -1) {
+            act = { type: 'blackjack', phase: activityState.blackjack.phase };
+        } else if (fishingSeat) {
+            act = { type: 'fishing', phase: fishingSeat.phase };
+        }
+
+        return { money, isPaused, activity: act };
+    }, [money, isPaused, bjSeatIndex, fishingSeat, activityState.blackjack.phase]);
+
 
     return (
         <div style={ { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' } }>
-            <TransitionOverlay isActive={ isTransitioning }/>
-            <NetworkIndicator roomCode={ roomCode } isHost={ isHost } ping={ ping }/>
+            <div className='absolute inset-0 z-0'>
+                <Canvas shadows dpr={ [1, 2] }
+                        gl={ { toneMapping: THREE.ReinhardToneMapping, toneMappingExposure: 1.2 } }>
+                    <Preload all/>
+                    <color attach='background' args={ [useThemeColor('--bg-page')] }/>
+                    <PerspectiveCamera makeDefault position={ [0, 12, 16] } fov={ 40 }
+                                       onUpdate={ c => c.lookAt(0, 0, 0) }/>
+                    <ambientLight intensity={ 0.15 }/>
+                    <hemisphereLight intensity={ 0.1 } groundColor='#000000'/>
 
-            {/* [OPTIMIZATION] Pass ref to UI element */ }
-            { !isSeated && <InteractionPrompt ref={ promptRef }/> }
+                    { currentScene === 'bar'
+                        ? <BarLevel isDoorOpen={ isTransitioning }
+                                    dealerHand={ activityState.blackjack.dealerHand }/>
+                        : <AlleyLevel isDoorOpen={ isTransitioning } isFireLit={ isFireLit }/>
+                    }
 
-            <SystemFeed messages={ systemMessages }/>
+                    { isReady && (
+                        <>
+                            <NetworkSync
+                                playerRef={ playerRef }
+                                visualsRef={ visualsRef }
+                                peerId={ peerId }
+                                isHost={ isHost }
+                                hostConn={ hostConn }
+                                connections={ connections }
+                                gameState={ gameState }
+                                interactionRef={ interactionStateRef }
+                                playerPose={ playerPose }
+                                setRemotePlayers={ setRemotePlayers }
+                                worldStateRef={ worldStateRef }
+                                currentScene={ currentScene }
+                                addAlert={ addAlert }
+                                activityState={ activityState }
+                                setPing={ setPing }
+                                playerName={ playerName }
+                                syncData={ mySyncData }
+                            />
 
-            { isPaused && (
-                <PauseMenu
-                    onResume={ () => setIsPaused(false) }
-                    onMainMenu={ handleReturnToMenu }
-                />
-            ) }
+                            <Player
+                                key={ currentScene }
+                                playerRef={ playerRef }
+                                visualsRef={ visualsRef }
+                                promptRef={ promptRef }
+                                interactionStateRef={ interactionStateRef }
+                                isPlaying={ gameState === 'playing' }
+                                inputLocked={ isInputLocked || isOccupied }
+                                initialPos={ playerSpawn.pos }
+                                initialRot={ playerSpawn.rot }
+                                barriers={ LEVELS[currentScene].barriers }
+                                portals={ LEVELS[currentScene].portals }
+                                interactables={ LEVELS[currentScene].interactables || [] }
+                                waterZones={ LEVELS[currentScene].waterZones || [] }
+                                onPortalEnter={ handlePortalEnter }
+                                onInteractChange={ () => {
+                                } }
+                                onPoseChange={ setPlayerPose }
+                                onSeatInteract={ handleSeatInteract }
+                                onTriggerInteract={ handleTriggerInteract }
+                                peerId={ peerId || 'Local' }
+                                seatData={
+                                    bjSeatIndex !== -1 ? {
+                                        seatIndex: bjSeatIndex,
+                                        hand: activityState.blackjack.seats[bjSeatIndex].hand,
+                                        activityType: 'blackjack'
+                                    } : fishingSeat ? {
+                                        seatIndex: -1,
+                                        hand: [],
+                                        activityType: 'fishing',
+                                        phase: fishingSeat.phase,
+                                        biteStrength: fishingSeat.biteStrength
+                                    } : null
+                                }
+                                name={ playerName }
+                            />
+                            { Object.entries(remotePlayers).map(([id, data]) => {
+                                if (id === peerId) return null;
+                                if (data.scene !== currentScene) return null;
 
-            { isSeated && (
-                <BlackjackHUD
-                    seat={ bjState.seats[mySeatIndex] }
-                    dealerHand={ bjState.dealerHand }
-                    isMyTurn={ bjState.activeSeatIndex === mySeatIndex }
-                    onBet={ (amt) => sendBjAction('BET', { amount: amt }) }
-                    onAction={ (act) => sendBjAction(act.toUpperCase()) }
-                    onLeave={ handleLeaveTable }
-                    seatLabel={ isSeated ? currentInteractable?.label : null }
-                    money={ money }
-                    exitLabel={ isSeated ? (currentInteractable?.behavior as any).exitLabel || 'Stand Up' : null }
-                />
-            ) }
+                                let seatData = null;
+                                const remoteBJIndex = activityState.blackjack.seats.findIndex(s => s.peerId === id);
+                                const remoteFishSeat = activityState.fishing.seats.find(s => s.peerId === id);
 
-            { gameState === 'menu' && (
-                <MainMenu
-                    onHost={ handleHost }
-                    onJoin={ handleJoin }
-                    onNameChange={ setPlayerName }
-                    name={ playerName }
-                />
-            ) }
+                                if (remoteBJIndex !== -1) {
+                                    seatData = {
+                                        seatIndex: remoteBJIndex,
+                                        hand: activityState.blackjack.seats[remoteBJIndex].hand,
+                                        activityType: 'blackjack'
+                                    };
+                                } else if (remoteFishSeat) {
+                                    seatData = {
+                                        seatIndex: -1,
+                                        hand: [],
+                                        activityType: 'fishing',
+                                        phase: remoteFishSeat.phase
+                                    };
+                                }
 
-            <Canvas
-                shadows
-                dpr={ [1, 2] }
-                gl={ {
-                    toneMapping: THREE.ReinhardToneMapping,
-                    toneMappingExposure: 1.2,
-                    antialias: false
-                } }
-            >
-                <color attach='background' args={ [useThemeColor('--bg-page')] }/>
-                <PerspectiveCamera
-                    makeDefault
-                    position={ [0, 12, 16] }
-                    fov={ 40 }
-                    near={ 0.1 }
-                    far={ 200 }
-                    onUpdate={ (c) => c.lookAt(0, 0, 0) }
-                />
+                                return (
+                                    <Player
+                                        key={ id }
+                                        peerId={ id }
+                                        isRemote={ true }
+                                        isPlaying={ true }
+                                        remoteData={ data }
+                                        worldStateRef={ worldStateRef }
+                                        initialPos={ data.pos }
+                                        initialRot={ data.rot }
+                                        barriers={ [] }
+                                        portals={ [] }
+                                        onPortalEnter={ () => {
+                                        } }
+                                        seatData={ seatData }
+                                    />
+                                );
+                            }) }
+                        </>
+                    ) }
+                    <EffectComposer enableNormalPass={ false }>
+                        <Pixelation granularity={ 4 }/>
+                        <Bloom luminanceThreshold={ 1 } intensity={ 1.2 } radius={ 0.5 }/>
+                    </EffectComposer>
+                </Canvas>
+            </div>
 
-                <ambientLight intensity={ 0.15 }/>
-                <hemisphereLight intensity={ 0.1 } groundColor='#000'/>
+            <div className='absolute inset-0 z-10 pointer-events-none'>
+                { !isReady && (
+                    <div
+                        className='absolute inset-0 z-50 flex flex-col items-center justify-center bg-page text-text-main pointer-events-auto'>
+                        <div className='text-xl font-bold'>
+                            { !peerId ? 'Connecting...' : `Loading Assets ${ Math.round(progress) }%` }
+                        </div>
+                        <div className='mt-2 text-sm text-text-muted animate-pulse'>preloading shaders & initializing
+                            connection
+                        </div>
+                    </div>
+                ) }
 
-                <NetworkSync
-                    playerRef={ playerRef }
-                    visualsRef={ visualsRef }
-                    peerId={ peerId }
-                    isHost={ isHost }
-                    hostConn={ hostConn }
-                    connections={ connections }
-                    gameState={ gameState }
+                <TransitionOverlay isActive={ isTransitioning }/>
+                <NetworkIndicator roomCode={ roomCode } isHost={ isHost } ping={ ping }/>
+                { !isOccupied && isReady && <InteractionPrompt ref={ promptRef }/> }
+                { isPaused && <div className='pointer-events-auto'><EscOverlayMenu onResume={ () => setIsPaused(false) }
+                                                                                   onMainMenu={ () => window.location.reload() }/>
+                </div> }
 
-                    // [OPTIMIZATION] Pass ref for high-freq updates
-                    interactionRef={ interactionStateRef }
-
-                    playerPose={ playerPose }
-                    setRemotePlayers={ setRemotePlayers }
-                    worldStateRef={ worldStateRef }
-                    currentScene={ currentScene }
-                    addAlert={ addAlert }
-                    bjState={ bjState }
-                    setPing={ setPing }
-                    playerName={ playerName }
-                    syncData={ mySyncData }
-                />
-
-                { currentScene === 'bar'
-                    ? <BarLevel isDoorOpen={ isDoorOpen } dealerHand={ bjState.dealerHand }/>
-                    : <AlleyLevel isDoorOpen={ isDoorOpen } isFireLit={ isFireLit }/>
-                }
-
-                <Player
-                    key={ currentScene }
-                    playerRef={ playerRef }
-                    visualsRef={ visualsRef }
-
-                    // [OPTIMIZATION] Pass UI refs to game loop
-                    promptRef={ promptRef }
-                    interactionStateRef={ interactionStateRef }
-
-                    isPlaying={ gameState === 'playing' }
-                    inputLocked={ isInputLocked || isSeated }
-                    initialPos={ playerSpawn.pos }
-                    initialRot={ playerSpawn.rot }
-                    barriers={ barriers }
-                    portals={ portals }
-                    interactables={ interactables }
-                    onPortalEnter={ handlePortalEnter }
-                    onInteractChange={ handleInteractChange }
-                    onPoseChange={ setPlayerPose }
-                    onSeatInteract={ handleSeatInteract }
-                    onTriggerInteract={ handleTriggerInteract }
-                    peerId={ peerId || 'Local' }
-                    seatData={ isSeated ? { seatIndex: mySeatIndex, hand: bjState.seats[mySeatIndex].hand } : null }
-                    name={ playerName }
-                />
-
-                { Object.entries(remotePlayers).map(([id, data]) => {
-                    if (id === peerId) return null;
-                    if (data.scene !== currentScene) return null;
-                    const seatIdx = bjState.seats.findIndex(s => s.peerId === id);
-                    const seatData = seatIdx !== -1 ? { seatIndex: seatIdx, hand: bjState.seats[seatIdx].hand } : null;
-                    return (
-                        <Player
-                            key={ id }
-                            peerId={ id }
-                            isRemote={ true }
-                            isPlaying={ true }
-                            remoteData={ data }
-                            worldStateRef={ worldStateRef }
-                            initialPos={ data.pos }
-                            initialRot={ data.rot }
-                            barriers={ [] }
-                            portals={ [] }
-                            onPortalEnter={ () => {
-                            } }
-                            seatData={ seatData }
+                { bjSeatIndex !== -1 && (
+                    <div className='absolute inset-0 pointer-events-none'>
+                        <BlackjackHUD
+                            seat={ activityState.blackjack.seats[bjSeatIndex] }
+                            dealerHand={ activityState.blackjack.dealerHand }
+                            isMyTurn={ activityState.blackjack.activeSeatIndex === bjSeatIndex }
+                            onBet={ (amt) => handleAction('BET', { amount: amt }) }
+                            onAction={ (act) => handleAction(act.toUpperCase()) }
+                            onLeave={ handleLeaveBlackjack }
+                            seatLabel={ currentInteractable?.label }
+                            money={ money }
+                            exitLabel={ (currentInteractable?.behavior as any)?.exitLabel || 'Stand Up' }
+                            gamePhase={ activityState.blackjack.phase }
                         />
-                    );
-                }) }
+                    </div>
+                ) }
 
-                <EffectComposer enableNormalPass={ false }>
-                    <Pixelation granularity={ 1 }/>
-                    <Bloom luminanceThreshold={ 1 } intensity={ 1.2 } radius={ 0.5 }/>
-                </EffectComposer>
-            </Canvas>
+                { fishingSeat && (
+                    <div className='absolute inset-0 pointer-events-none'>
+                        <FishingHUD
+                            gameState={ activityState.fishing }
+                            mySeat={ fishingSeat }
+                            onAction={ handleAction }
+                            onLeave={ handleLeave }
+                            isDay={ isDay }
+                            isRaining={ isRaining }
+                        />
+                    </div>
+                ) }
+
+                { gameState === 'menu' && isReady && (
+                    <div className='pointer-events-auto'>
+                        <MainMenu onHost={ async () => {
+                            await startHosting();
+                            setGameState('playing');
+                        } } onJoin={ async (id) => {
+                            await joinRoom(id);
+                            setGameState('playing');
+                        } } onNameChange={ setPlayerName } name={ playerName }/>
+                    </div>
+                ) }
+                <div className='absolute top-10 right-4 z-100 pointer-events-none'><SystemFeed
+                    messages={ systemMessages }/></div>
+            </div>
         </div>
     );
 }

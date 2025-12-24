@@ -1,9 +1,5 @@
 import React from 'react';
 
-/* -------------------------------------------------------------------------- */
-/* BACKGROUND COMPONENT                                                       */
-/* -------------------------------------------------------------------------- */
-
 /**
  * Renders a performant, purely CSS-based starfield.
  * Uses multiple radial-gradient layers and drop-shadow filters to create depth.
@@ -36,12 +32,8 @@ const SpaceBackground: React.FC = () => (
     </div>
 );
 
-/* -------------------------------------------------------------------------- */
-/* MAIN PAGE COMPONENT                                                        */
-/* -------------------------------------------------------------------------- */
-
 /**
- * The Home landing page.
+ * Home page.
  * Acts as the desktop workspace backdrop where floating widgets are managed.
  */
 export default function Home() {

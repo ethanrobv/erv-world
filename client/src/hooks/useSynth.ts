@@ -1,10 +1,5 @@
 import { useRef, useEffect } from 'react';
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-
-/* -------------------------------------------------------------------------- */
-
 /**
  * Extends the Window interface to include webkitAudioContext for legacy Safari support.
  */
@@ -12,31 +7,20 @@ interface WindowWithWebkitAudio extends Window {
     webkitAudioContext?: typeof AudioContext;
 }
 
-/* -------------------------------------------------------------------------- */
-/* HOOK DEFINITION                                                            */
-/* -------------------------------------------------------------------------- */
-
 /**
  * A custom hook for simple synthesizer playback using the Web Audio API.
  * Manages the AudioContext lifecycle and provides a function to play tones.
  */
 export const useSynth = () => {
-    /* -------------------------------------------------------------------------- */
-    /* STATE & REFS                                                               */
-    /* -------------------------------------------------------------------------- */
-
-    /** * Reference to the AudioContext.
-     * Initialized lazily or inside useEffect to strictly follow React lifecycle.
+    /**
+     * Reference to the AudioContext.
+     * Initialized lazily inside useEffect to ensure it runs only on the client side.
      */
     const audioCtx = useRef<AudioContext | null>(null);
 
-    /* -------------------------------------------------------------------------- */
-    /* LIFECYCLE                                                                  */
-    /* -------------------------------------------------------------------------- */
-
     useEffect(() => {
-        // 1. Initialize AudioContext
-        // We cast window to our extended interface to safely check for webkitAudioContext
+        // Initialize AudioContext
+        // Cast window to our extended interface to safely check for webkitAudioContext
         const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext;
 
         if (AudioContextClass) {
@@ -45,22 +29,19 @@ export const useSynth = () => {
             console.warn('Web Audio API is not supported in this browser.');
         }
 
-        // 2. Cleanup on unmount
+        // Cleanup on unmount
         return () => {
-            // Ensure we close the context to prevent memory leaks and hardware locks
+            // Close the context to prevent memory leaks and hardware locks
             if (audioCtx.current && audioCtx.current.state !== 'closed') {
                 audioCtx.current.close().catch((err) => console.error('Error closing AudioContext:', err));
             }
         };
     }, []);
 
-    /* -------------------------------------------------------------------------- */
-    /* PLAYBACK LOGIC                                                             */
-    /* -------------------------------------------------------------------------- */
-
     /**
      * Plays a single tone with a simple AD (Attack-Decay) envelope.
-     * * @param freq - The frequency of the note in Hertz (Hz).
+     *
+     * @param freq - The frequency of the note in Hertz (Hz).
      * @param type - The waveform shape (e.g., 'sine', 'square', 'sawtooth', 'triangle').
      */
     const playTone = (freq: number, type: OscillatorType) => {
@@ -82,7 +63,13 @@ export const useSynth = () => {
         // 2. Create Gain Node (Volume Envelope)
         const gain = ctx.createGain();
 
-        // Envelope Settings
+        // 3. Connect Graph: Oscillator -> Gain -> Destination (Speakers)
+        // This establishes the audio signal path.
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+
+        // 4. Envelope Settings (AD - Attack/Decay)
         const attackTime = 0.05;
         const decayTime = 1;
         const peakGain = 0.3;
@@ -96,11 +83,8 @@ export const useSynth = () => {
         // Decay: Ramp down to near-silence
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + decayTime);
 
-        // 3. Connect Graph: Oscillator -> Gain -> Destination (Speakers)
-        osc.connect(gain);
-        gain.connect(ctx.destination);
 
-        // 4. Trigger
+        // 5. Trigger
         osc.start();
 
         // Stop oscillator slightly after decay finishes to ensure complete silence

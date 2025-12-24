@@ -1,24 +1,15 @@
-/* -------------------------------------------------------------------------- */
-/* GLOBAL CONSTANTS & TUNING                                                  */
-/* -------------------------------------------------------------------------- */
+import React from "react";
+import type { DataConnection } from "peerjs";
 
-export const MOVEMENT_SPEED = 6;
+export const MOVEMENT_SPEED = 7;
 export const ROTATION_SPEED = 12;
 
-export const FADE_OUT_DURATION = 1000;
-export const FADE_IN_DURATION = 600;
-
-/* -------------------------------------------------------------------------- */
-/* CORE STATE TYPES                                                           */
-/* -------------------------------------------------------------------------- */
+export const FADE_OUT_DURATION = 400;
+export const FADE_IN_DURATION = 400;
 
 export type GameState = 'menu' | 'playing';
 export type SceneType = 'bar' | 'alley';
-export type PlayerPose = 'idle' | 'sit';
-
-/* -------------------------------------------------------------------------- */
-/* BLACKJACK TYPES                                                            */
-/* -------------------------------------------------------------------------- */
+export type PlayerPose = 'idle' | 'sit' | 'fishing';
 
 export type Card = {
     suit: '♠' | '♥' | '♣' | '♦';
@@ -27,26 +18,77 @@ export type Card = {
     isHidden?: boolean;
 };
 
+// --- ACTIVITY SYSTEM TYPES ---
+
+export type ActivityType = 'blackjack' | 'fishing';
+
+// 1. BLACKJACK STATE (Unchanged logic, just specific type)
 export type BJSeatState = {
     peerId: string | null;
     hand: Card[];
     bet: number;
-    status: 'empty' | 'betting' | 'playing' | 'stand' | 'bust' | 'won' | 'lost' | 'push' | 'blackjack';
+    status: 'empty' | 'betting' | 'playing' | 'stand' | 'bust' | 'won' | 'lost' | 'push' | 'blackjack' | 'waiting';
 };
 
-export type BJGameState = {
+export interface BJGameState {
+    type: 'blackjack';
     phase: 'idle' | 'betting' | 'dealing' | 'playing' | 'dealerTurn' | 'payout';
     dealerHand: Card[];
     seats: BJSeatState[];
     activeSeatIndex: number;
     timer: number;
+}
+
+// 2. FISHING STATE (Refactored for Multiplayer)
+export type FishType = {
+    id: string;
+    name: string;
+    baseWeight: number;
+    stdDev: number;
+    rarity: number;
+    conditions: { time?: 'day' | 'night'; weather?: 'clear' | 'rain' };
 };
 
-/* -------------------------------------------------------------------------- */
-/* WORLD & INTERACTION TYPES                                                  */
-/* -------------------------------------------------------------------------- */
+export type CatchRecord = { count: number; maxWeight: number };
 
-// Represents an Axis-Aligned Bounding Box (AABB) for collision
+// New: Individual Fishing Seat
+export type FishingSeat = {
+    peerId: string;
+    phase: 'idle' | 'casting' | 'waiting' | 'bitten' | 'reeling' | 'caught' | 'lost';
+    timer: number;       // Individual bite/reel timer
+    biteStrength: number; // Individual bobber physics
+    lastCatch: { fishId: string; weight: number } | null;
+};
+
+export interface FishingState {
+    type: 'fishing';
+    // Global Stats (Shared)
+    catchLog: Record<string, CatchRecord>;
+    env: { isDay: boolean; isRaining: boolean };
+    // Participants
+    seats: FishingSeat[];
+}
+
+// 3. COMPOSITE WORLD STATE
+// This allows both activities to run concurrently
+export interface ActivityState {
+    blackjack: BJGameState;
+    fishing: FishingState;
+}
+
+export type RemotePlayerState = {
+    pos: [number, number, number];
+    rot: number;
+    pose: PlayerPose;
+    interaction: string | null;
+    scene: SceneType;
+    isFading?: boolean;
+    lastSeen?: number;
+    name?: string;
+    activity?: { type: ActivityType; phase: string };
+    meta?: any;
+};
+
 export type Barrier = {
     readonly x: readonly [number, number];
     readonly z: readonly [number, number];
@@ -71,7 +113,7 @@ export type InteractionBehavior =
     | {
     type: 'seat';
     seatIndex: number;
-    activity: 'blackjack';
+    activity: ActivityType;
     anchorPosition: [number, number, number];
     anchorRotation: number;
     exitPosition: [number, number, number];
@@ -83,255 +125,62 @@ export type InteractionBehavior =
 
 export type Interactable = {
     id: string;
+    type: string;
     label: string;
     position: [number, number, number];
+    rotation?: [number, number, number];
     interactionRadius: number;
-    behavior: InteractionBehavior;
+    behavior?: InteractionBehavior;
+    [key: string]: any;
 };
 
-export type SceneConfig = {
+export type LevelData = {
     barriers: Barrier[];
     portals: PortalDef[];
-    interactables?: Interactable[];
+    interactables: Interactable[];
+    staticProps?: Interactable[];
+    waterZones?: { x: number[], z: number[] }[];
 };
 
-/* -------------------------------------------------------------------------- */
-/* NETWORKING TYPES                                                           */
-/* -------------------------------------------------------------------------- */
-
-export type RemotePlayerState = {
-    pos: [number, number, number];
-    rot: number;
-    pose: PlayerPose;
-    interaction: string | null;
-    scene: SceneType;
-    isFading?: boolean;
-    lastSeen?: number;
-    name?: string;
-    meta?: Record<string, any>;
+export type ActivityContext = {
+    peerId: string | null;
+    isHost: boolean;
+    money: number;
+    setMoney: React.Dispatch<React.SetStateAction<number>>;
+    addAlert: (msg: string) => void;
+    gameAssets: React.RefObject<any>;
+    // Updated: Dispatch now implies targeting the strategy that called it
+    dispatch: (action: string, payload?: any) => void;
+    connections: DataConnection[];
 };
 
-/* -------------------------------------------------------------------------- */
-/* UTILITIES                                                                  */
-/* -------------------------------------------------------------------------- */
+export interface ActivityStrategy<T> {
+    reducer: (
+        prev: T,
+        action: string,
+        payload: any,
+        assets: React.RefObject<any>
+    ) => T;
 
-/**
- * Creates a collision barrier from a center point and dimensions.
- * @param x - Center X coordinate
- * @param z - Center Z coordinate
- * @param width - Total width (X axis size)
- * @param depth - Total depth (Z axis size)
- */
-const createBarrier = (x: number, z: number, width: number, depth: number): Barrier => {
-    const halfW = width / 2;
-    const halfD = depth / 2;
-    return {
-        x: [x - halfW, x + halfW],
-        z: [z - halfD, z + halfD]
-    };
-};
+    onAction?: (
+        action: string,
+        payload: any,
+        ctx: ActivityContext
+    ) => boolean;
 
-/* -------------------------------------------------------------------------- */
-/* SCENE DATA CONFIGURATION                                                   */
-/* -------------------------------------------------------------------------- */
+    onStateChange?: (
+        prev: T,
+        current: T,
+        ctx: ActivityContext
+    ) => void;
 
-export const SCENE_DATA: Record<SceneType, SceneConfig> = {
-    bar: {
-        barriers: [
-            // Architecture
-            // Far Left Wall (Back)
-            createBarrier(-22.4, -4.25, 55.2, 1.5),
-            // Far Right Wall (Back)
-            createBarrier(28.4, -4.25, 43.2, 1.5),
-            // Bar Counter Main
-            createBarrier(-4.0, -1.6, 7.0, 0.9),
-            // Bar Side Nook
-            createBarrier(-6.8, -2.75, 1.5, 2.5),
-            // Bar Entrance Pillar/Divider
-            createBarrier(-1.3, -2.3, 1.35, 1.3),
+    onTick?: (
+        state: T,
+        ctx: ActivityContext
+    ) => void;
 
-            // Furniture: Blackjack Table
-            // Main Table Area
-            createBarrier(2.9, 2.4, 6.6, 3.2),
-            // Chair 1 (Left)
-            createBarrier(-1.2, 2.5, 0.6, 0.6),
-            // Chair 2 (Bottom-Left)
-            createBarrier(1.0, 4.3, 0.6, 1),
-            // Chair 3 (Bottom-Center)
-            createBarrier(3.0, 4.3, 0.6, 1),
-            // Chair 4 (Bottom-Right)
-            createBarrier(5.0, 4.3, 0.6, 1),
-            // Chair 5 (Right)
-            createBarrier(7.1, 2.5, 0.6, 0.6),
-
-            // Furniture: Bar Stools
-            // Left
-            createBarrier(-6.0, -0.6, 0.6, 0.6),
-            // Center
-            createBarrier(-4.0, -0.6, 0.6, 0.6),
-            // Right
-            createBarrier(-2.0, -0.6, 0.6, 0.6),
-        ],
-        portals: [{
-            position: [6, 0, -3.9],
-            targetScene: 'alley',
-            spawnPosition: [6, 0, -7],
-            spawnRotation: 0
-        }],
-        interactables: [
-            {
-                id: 'bj-seat-0',
-                label: 'Seat 1',
-                position: [-1.0, 0, 2.5],
-                interactionRadius: 1.4,
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 0,
-                    activity: 'blackjack',
-                    anchorPosition: [-0.8, 0.3, 2.6],
-                    anchorRotation: Math.PI / 2,
-                    exitPosition: [-1.8, 0, 2.5]
-                }
-            },
-            {
-                id: 'bj-seat-1',
-                label: 'Seat 2',
-                position: [1.0, 0, 4.5],
-                interactionRadius: 1.2,
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 1,
-                    activity: 'blackjack',
-                    anchorPosition: [1.0, 0.3, 4.3],
-                    anchorRotation: Math.PI,
-                    exitPosition: [1.0, 0, 5.5]
-                }
-            },
-            {
-                id: 'bj-seat-2',
-                label: 'Seat 3',
-                position: [3.0, 0, 4.5],
-                interactionRadius: 1.2,
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 2,
-                    activity: 'blackjack',
-                    anchorPosition: [3.0, 0.3, 4.3],
-                    anchorRotation: Math.PI,
-                    exitPosition: [3.0, 0, 5.5]
-                }
-            },
-            {
-                id: 'bj-seat-3',
-                label: 'Seat 4',
-                position: [5.0, 0, 4.5],
-                interactionRadius: 1.2,
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 3,
-                    activity: 'blackjack',
-                    anchorPosition: [4.9, 0.3, 4.3],
-                    anchorRotation: Math.PI,
-                    exitPosition: [5.0, 0, 5.5]
-                }
-            },
-            {
-                id: 'bj-seat-4',
-                label: 'Seat 5',
-                position: [7.0, 0, 2.5],
-                interactionRadius: 1.4,
-                behavior: {
-                    type: 'seat',
-                    seatIndex: 4,
-                    activity: 'blackjack',
-                    anchorPosition: [6.8, 0.3, 2.6],
-                    anchorRotation: -Math.PI / 2,
-                    exitPosition: [7.8, 0, 2.5]
-                }
-            },
-            {
-                id: 'stool-1',
-                label: 'Sit',
-                position: [-6, 0, -0.6],
-                interactionRadius: 1.5,
-                behavior: {
-                    type: 'station',
-                    anchorPosition: [-6, 0.45, -0.6],
-                    anchorRotation: Math.PI,
-                    exitPosition: [-6, 0, 0.5],
-                    pose: 'sit',
-                    exitLabel: 'Stand Up'
-                }
-            },
-            {
-                id: 'stool-2',
-                label: 'Sit',
-                position: [-4, 0, -0.6],
-                interactionRadius: 1.5,
-                behavior: {
-                    type: 'station',
-                    anchorPosition: [-4, 0.45, -0.6],
-                    anchorRotation: Math.PI,
-                    exitPosition: [-4, 0, 0.5],
-                    pose: 'sit',
-                    exitLabel: 'Stand Up'
-                }
-            },
-            {
-                id: 'stool-3',
-                label: 'Sit',
-                position: [-2, 0, -0.6],
-                interactionRadius: 1.5,
-                behavior: {
-                    type: 'station',
-                    anchorPosition: [-2, 0.45, -0.6],
-                    anchorRotation: Math.PI,
-                    exitPosition: [-2, 0, 0.5],
-                    pose: 'sit',
-                    exitLabel: 'Stand Up'
-                }
-            }
-        ]
-    },
-    alley: {
-        barriers: [
-            // Deep Back Wall
-            createBarrier(0, -10, 30, 1.0),
-            // Dumpster / Obstacle Left
-            createBarrier(-5.0, -8.0, 3, 2.0),
-            // Bench / Obstacle Right
-            createBarrier(2, -9.5, 2.8, 1),
-        ],
-        portals: [{
-            position: [6, 0, -10],
-            targetScene: 'bar',
-            spawnPosition: [6, 0, -1],
-            spawnRotation: 0
-        }],
-        interactables: [
-            {
-                id: 'alley-bench',
-                label: 'Sit',
-                position: [2.0, 0, -9.6],
-                interactionRadius: 1.8,
-                behavior: {
-                    type: 'station',
-                    anchorPosition: [2.5, 0.35, -8.6],
-                    anchorRotation: 0,
-                    exitPosition: [2.5, 0, -8.2],
-                    pose: 'sit',
-                    exitLabel: 'Stand Up'
-                }
-            },
-            {
-                id: 'trash-fire',
-                label: 'Toggle Fire',
-                position: [-5, 0, -2.5], // Vertically between dumpster (z=-8) and street (z=3.5)
-                interactionRadius: 1.5,
-                behavior: {
-                    type: 'trigger'
-                }
-            },
-        ]
-    }
-};
+    onMount?: (
+        state: T, // Receives global state to extract its slice if needed
+        ctx: ActivityContext
+    ) => T;
+}
