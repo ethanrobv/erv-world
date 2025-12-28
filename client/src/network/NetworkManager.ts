@@ -1,6 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import SimplePeer, { type Instance as PeerInstance, type SignalData } from 'simple-peer';
+import { decode, encode } from '@msgpack/msgpack';
 import { useNetworkStore } from '../store/networkStore';
+import { type GamePacket } from './Protocol';
 
 /**
  * Configuration for the signaling server connection.
@@ -16,8 +18,8 @@ const SIGNAL_SERVER_URL = import.meta.env.VITE_SIGNAL_SERVER_URL || 'http://loca
  * independent of the React lifecycle.
  * 2. Star Topology: In a multiplayer session, one peer is the 'HOST' and
  * others are 'CLIENTS'. This centralizes game logic authority.
- * 3. Event-Based: Uses a simple internal listener system to decouple
- * raw network packets from game engine logic.
+ * 3. Binary Protocol: Uses MessagePack (msgpack) instead of JSON for high-performance,
+ * low-bandwidth serialization suitable for 60Hz game loops.
  */
 class NetworkManager {
     private socket: Socket | null = null;
@@ -97,8 +99,8 @@ class NetworkManager {
          */
         peer.on('connect', () => {
             useNetworkStore.getState().addPeer(targetId);
-
-            // If Host, we would typically send the current world snapshot here.
+            // NOTE: The initial World Snapshot is triggered by the Game Engine,
+            // not here, to keep this class pure logic.
         });
 
         /**
@@ -150,27 +152,29 @@ class NetworkManager {
     }
 
     /**
-     * Sends a message to a specific peer.
+     * Sends a strictly typed message to a specific peer.
+     * Uses MessagePack for binary serialization.
      * @param targetId - Socket ID of the recipient.
-     * @param payload - Object to be serialized and sent.
+     * @param packet - The typed GamePacket to serialize.
      */
-    public send(targetId: string, payload: object): void {
+    public send(targetId: string, packet: GamePacket): void {
         const peer = this.peers.get(targetId);
         if (peer?.connected) {
-            const data = JSON.stringify(payload);
-            peer.send(data);
+            const encoded = encode(packet);
+            peer.send(encoded);
         }
     }
 
     /**
-     * Broadcasts a message to all connected peers.
-     * * @param payload - Object to be serialized and sent.
+     * Broadcasts a strictly typed message to all connected peers.
+     * Uses MessagePack for binary serialization.
+     * * @param packet - The typed GamePacket to serialize.
      */
-    public broadcast(payload: object): void {
-        const data = JSON.stringify(payload);
+    public broadcast(packet: GamePacket): void {
+        const encoded = encode(packet);
         this.peers.forEach((peer) => {
             if (peer.connected) {
-                peer.send(data);
+                peer.send(encoded);
             }
         });
     }
@@ -178,17 +182,20 @@ class NetworkManager {
     /**
      * Decodes and routes incoming P2P data.
      * @param senderId - Socket ID of the sender.
-     * @param data - The raw binary data.
+     * @param data - The raw binary data (Uint8Array).
      */
     private processIncomingData(senderId: string, data: Uint8Array): void {
         try {
-            const decoded = new TextDecoder().decode(data);
-            const packet = JSON.parse(decoded);
+            // Binary Decode (MessagePack)
+            // We cast to GamePacket because we trust our Protocol definition.
+            const packet = decode(data) as GamePacket;
 
-            // Routing logic for the game engine will be implemented here.
-            console.log(`[Network] Packet from ${ senderId }:`, packet);
+            // TODO: Route this packet to the Game Engine / Event Bus.
+            // For now, we log it to verify the binary stream is working.
+            // console.log(`[Packet] From ${ senderId }:`, packet);
+
         } catch (err) {
-            console.error('[Network] Data Parsing Error:', err);
+            console.error('[Network] Packet Decode Error:', err);
         }
     }
 
