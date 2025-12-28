@@ -1,131 +1,107 @@
-import express, { type Request, type Response } from 'express';
+import express from 'express';
+import http from 'http';
+import { Server, Socket } from 'socket.io';
+import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+/**
+ * Config
+ */
+const PORT = process.env.PORT || 3001;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+app.use(cors({ origin: CORS_ORIGIN }));
 
-app.use(express.json());
+const server = http.createServer(app);
 
-interface RoomData {
-    hostId: string;
-    lastUpdate: number;
-    createdAt: number;
-}
-
-const roomRegistry = new Map<string, RoomData>();
-
-const CLEANUP_INTERVAL = 300000; // Check every 300s
-
-setInterval(() => {
-    roomRegistry.forEach((data, code) => {
-        if (!data.hostId) {
-            roomRegistry.delete(code);
-            console.log(`[GARBAGE COLLECTION] Deleted room ${ code }`);
-        }
-    });
-}, CLEANUP_INTERVAL);
-
-// API ROUTES
-
-app.get('/api/game/rooms', (_req: Request, res: Response) => {
-    const rooms = Array.from(roomRegistry.entries()).map(([code, data]) => ({
-        code,
-        age: Date.now() - data.createdAt
-    }));
-    res.json({ rooms });
+/**
+ * Socket.IO Instance.
+ * Configured to respect the environment's CORS policy.
+ */
+const io = new Server(server, {
+    cors: {
+        origin: CORS_ORIGIN,
+        methods: ['GET', 'POST']
+    }
 });
 
 /**
- * HOST ROOM (Initial Push)
+ * Room Registry.
+ * Maps a Room Code (string) to the Host's Socket ID.
  */
-app.post('/api/game/host', (req: Request, res: Response) => {
-    const { peerId } = req.body || {};
+const rooms: Map<string, string> = new Map();
 
-    if (!peerId || typeof peerId !== 'string') {
-        res.status(400).json({ error: 'Missing or invalid peerId' });
-        return;
-    }
+io.on('connection', (socket: Socket) => {
+    console.log(`[Connect] Socket ID: ${ socket.id }`);
 
-    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    /**
+     * HOST: Registers a new game lobby.
+     * @param roomCode - Unique identifier for the room.
+     * @param callback - Acknowledgment callback.
+     */
+    socket.on('host:create', (roomCode: string, callback: (response: { success: boolean }) => void) => {
+        if (rooms.has(roomCode)) {
+            console.warn(`[Host] Failed to create room ${ roomCode }: Already exists.`);
+            callback({ success: false });
+            return;
+        }
 
-    roomRegistry.set(roomCode, {
-        hostId: peerId,
-        lastUpdate: Date.now(),
-        createdAt: Date.now()
+        rooms.set(roomCode, socket.id);
+        socket.join(roomCode);
+        console.log(`[Host] Room created: ${ roomCode } by ${ socket.id }`);
+        callback({ success: true });
     });
 
-    console.log(`[ROOM CREATED] Code: ${ roomCode } | Host: ${ peerId }`);
-    res.json({ roomCode });
+    /**
+     * CLIENT: Attempts to join an existing lobby.
+     * @param roomCode - The code of the room to join.
+     */
+    socket.on('client:join', (roomCode: string) => {
+        const hostId = rooms.get(roomCode);
+
+        if (!hostId) {
+            socket.emit('error', { message: 'Room not found.' });
+            return;
+        }
+
+        io.to(hostId).emit('host:peer-joining', {
+            peerId: socket.id
+        });
+
+        console.log(`[Client] ${ socket.id } attempting to join room ${ roomCode }`);
+    });
+
+    /**
+     * SIGNALING: Relays WebRTC handshake data (SDP/ICE).
+     * @param data - The payload containing the signal and target.
+     */
+    socket.on('signal', (data: { target: string; signal: unknown }) => {
+        io.to(data.target).emit('signal', {
+            sender: socket.id,
+            signal: data.signal
+        });
+    });
+
+    /**
+     * DISCONNECT: Cleanup routine.
+     */
+    socket.on('disconnect', () => {
+        for (const [code, hostId] of rooms.entries()) {
+            if (hostId === socket.id) {
+                console.log(`[Disconnect] Host left. Closing room ${ code }`);
+                rooms.delete(code);
+                io.to(code).emit('room:closed');
+                break;
+            }
+        }
+        console.log(`[Disconnect] Socket ID: ${ socket.id }`);
+    });
 });
 
-app.put('/api/game/room/:code', (req: Request, res: Response) => {
-    const { peerId } = req.body;
-    const code = req.params.code?.toUpperCase();
-    const room = roomRegistry.get(code || '');
-
-    if (!room) {
-        return res.status(404).json({ error: 'Room not found' });
-    }
-
-    room.hostId = peerId;
-    room.lastUpdate = Date.now();
-
-    console.log(`[MIGRATION] Room ${ code } claimed by ${ peerId }`);
-    res.json({ success: true });
-});
-
-app.get('/api/game/room/:code', (req: Request, res: Response) => {
-    const code = req.params.code?.toUpperCase();
-    const room = roomRegistry.get(code || '');
-
-    if (room) {
-        room.lastUpdate = Date.now();
-        res.json({ hostId: room.hostId });
-    } else {
-        res.status(404).json({ error: 'Room not found' });
-    }
-});
-
-app.delete('/api/game/room/:code', (req: Request, res: Response) => {
-    const code = req.params.code?.toUpperCase();
-    const { peerId } = req.body;
-
-    if (!code || !peerId) {
-        return res.status(400).json({ error: 'Missing code or peerId' });
-    }
-
-    const room = roomRegistry.get(code);
-
-    if (!room) {
-        return res.json({ success: true });
-    }
-
-    // Sanity check: the registered host should be sending the request
-    if (room.hostId !== peerId) {
-        console.warn(`[SECURITY] Failed delete attempt for ${ code }. Requestor: ${ peerId }, Host: ${ room.hostId }`);
-        return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    roomRegistry.delete(code);
-    console.log(`[ROOM] ${ code } deleted by host ${ peerId } (Clean Exit)`);
-    res.json({ success: true });
-});
-
-// STATIC FILES
-
-app.use(express.static(path.join(__dirname, '../public')));
-
-app.get(/.*/, (_req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, '../public/index.html'));
-});
-
-app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`Server running on port ${ PORT }`);
+server.listen(PORT, () => {
+    console.log(`Signal Server running on port ${ PORT }`);
+    console.log(`CORS Policy: ${ CORS_ORIGIN }`);
 });

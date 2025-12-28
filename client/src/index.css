@@ -1,371 +1,200 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
+/*
+  THEME CONFIGURATION
+  Central definition for dynamic theme variables.
+*/
 @theme {
-    /* Layout */
-    --color-page: var(--bg-page);
-    --color-surface: var(--bg-surface);
-    --color-surface-highlight: var(--bg-surface-highlight);
+    /* BACKGROUNDS */
+    --color-main: var(--bg-main);
+    --color-panel: var(--bg-panel);
+    --color-navbar: var(--bg-navbar);
 
-    /* Text & Borders */
-    --color-text-main: var(--text-main);
-    --color-text-muted: var(--text-muted);
-    --color-border-base: var(--border-base);
+    /* TYPOGRAPHY */
+    --color-primary: var(--text-primary);
+    --color-muted: var(--text-muted);
 
-    /* Brand */
-    --color-primary: var(--brand-primary);
-    --color-primary-fg: var(--brand-primary-fg);
+    /* ACCENTS */
+    --color-accent: var(--accent-color);
 
-    /* Game State Colors */
-    --color-game-danger: var(--game-danger);
-    --color-game-success: var(--game-success);
-    --color-game-accent: var(--game-accent);
-
-    /* Game Assets: General */
-    --color-game-sky: var(--game-sky);
-
-    /* Game Assets: Surfaces (Floors/Walls) */
-    --color-game-floor-wood: var(--game-floor-wood);
-    --color-game-floor-road: var(--game-floor-road);
-    --color-game-wall-brick: var(--game-wall-brick);
-    --color-game-water: var(--game-water);
-
-    /* Game Assets: Objects (Props/Furniture) */
-    --color-game-object-wood: var(--game-object-wood);
-    --color-game-object-metal: var(--game-object-metal);
-
-    /* Game Assets: Fishing */
-    --color-game-fishing-rod: var(--game-fishing-rod);
-    --color-game-fishing-bobber-top: var(--game-fishing-bobber-top);
-    --color-game-fishing-bobber-bottom: var(--game-fishing-bobber-bottom);
-
-    --color-game-casino-chip-10: var(--game-casino-chip-10);
-    --color-game-casino-chip-25: var(--game-casino-chip-25);
-    --color-game-casino-chip-50: var(--game-casino-chip-50);
-    --color-game-casino-chip-100: var(--game-casino-chip-100);
-
-    /* Synth Keys */
-    --color-key-white-bg: var(--key-white-bg);
-    --color-key-white-border: var(--key-white-border);
-    --color-key-white-active: var(--key-white-active);
-    --color-key-black-bg: var(--key-black-bg);
-    --color-key-black-border: var(--key-black-border);
-    --color-key-black-active: var(--key-black-active);
+    /* TRANSITIONS */
+    --animate-theme: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-:root {
-    /* LIGHT THEME */
-    --bg-page: #fdfaf3;
-    --bg-surface: #ffffff;
-    --bg-surface-highlight: #f8f8f2;
-    --text-main: #18181b;
-    --text-muted: #71717a;
-    --border-base: #e4e4e7;
-    --brand-primary: #18181b;
-    --brand-primary-fg: #ffffff;
-
-    /* Synth Keys (Light) */
-    --key-white-bg: #ffffff;
-    --key-white-border: #e4e4e7;
-    --key-white-active: #f4f4f5;
-    --key-black-bg: #18181b;
-    --key-black-border: #000000;
-    --key-black-active: #3f3f46;
-
-    /* Game Assets */
-    --game-sky: #7dd3fc;
-    --game-accent: #f59e0b;
-    --game-danger: #ef4444;
-    --game-success: #22c55e;
-    --game-grass: #65a30d;
-
-    --game-casino-chip-10: #3b82f6;
-    --game-casino-chip-25: #22c55e;
-    --game-casino-chip-50: #ef4444;
-    --game-casino-chip-100: #18181b;
-
-    /* Fishing Assets (Light) */
-    --game-fishing-rod: #7c2d12;
-    --game-fishing-bobber-top: #dc2626;
-    --game-fishing-bobber-bottom: #f8fafc;
-
-    /* Surfaces */
-    --game-floor-wood: #78350f;
-    --game-floor-road: #3f3f46;
-    --game-wall-brick: #9f4636;
-    --game-brick-base: #9f4636;
-    --game-brick-mortar: #d6d3d1;
-    --game-water: #3b82f6;
-
-
-    /* Objects */
-    --game-object-wood: #b45309;
-    --game-object-metal: #52525b;
-
-    /* Characters (Light) */
-    --player-head: #e0ac69;
-    --player-torso: #f4f4f5;
-    --player-legs: #18181b;
-    --npc-vest: #27272a;
-    --npc-apron: #2563eb;
-    --npc-shirt-smoker: #52525b;
-
-    /* Lighting */
-    --game-light-warm: #ffaa00;
-    --game-light-cool: #e0f2fe;
-    --game-neon-main: #db2777;
-    --game-neon-alt: #2563eb;
-    --game-sun-color: #fff7ed;
-    --game-window-glass: #dbeafe;
+/*
+  GLOBAL DEFAULTS
+*/
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    transition: var(--animate-theme);
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
 }
 
-:root[data-theme='dark'] {
-    /* DARK THEME */
-    --bg-page: #0c0c0e;
-    --bg-surface: #18181b;
-    --bg-surface-highlight: #27272a;
-    --text-main: #fafafa;
-    --text-muted: #a1a1aa;
-    --border-base: #3f3f46;
-    --brand-primary: #ffffff;
-    --brand-primary-fg: #09090b;
+/* ============================================================================
+  LAYER 1: BASE LIGHTING (TIME OF DAY)
+  Establishes the foundational brightness, contrast, and base hues.
+  Default Assumption: Warm Season, Clear Weather.
+  =============================================================================
+*/
 
-    /* Synth Keys (Dark) */
-    --key-white-bg: #27272a;
-    --key-white-border: #3f3f46;
-    --key-white-active: #3f3f46;
-    --key-black-bg: #09090b;
-    --key-black-border: #000000;
-    --key-black-active: #18181b;
-
-    /* Game Assets */
-    --game-sky: #0c4a6e;
-    --game-accent: #fbbf24;
-    --game-grass: #365314;
-
-    --game-casino-chip-10: #60a5fa;
-    --game-casino-chip-25: #4ade80;
-    --game-casino-chip-50: #f87171;
-    --game-casino-chip-100: #27272a;
-
-    /* Fishing Assets (Dark) */
-    --game-fishing-rod: #d97706;
-    --game-fishing-bobber-top: #ef4444;
-    --game-fishing-bobber-bottom: #f3f4f6;
-
-    /* Surfaces */
-    --game-floor-wood: #2e1a05;
-    --game-floor-road: #18181b;
-    --game-wall-brick: #451a03;
-    --game-brick-base: #4a2c2a;
-    --game-brick-mortar: #18181b;
-    --game-water: #1e3a8a;
-
-    /* Objects */
-    --game-object-wood: #713f12;
-    --game-object-metal: #3f3f46;
-
-    /* Characters (Dark) */
-    --player-head: #e0ac69;
-    --player-torso: #fafafa;
-    --player-legs: #18181b;
-    --npc-vest: #18181b;
-    --npc-apron: #3b82f6;
-    --npc-shirt-smoker: #52525b;
-
-    /* Lighting */
-    --game-light-warm: #f59e0b;
-    --game-light-cool: #0ea5e9;
-    --game-neon-main: #d946ef;
-    --game-neon-alt: #3b82f6;
-    --game-sun-color: #000000;
-    --game-window-glass: #0f172a;
+/* DAWN */
+:root[data-time="dawn"] {
+    --bg-main: #fce7f3; /* Soft Pink */
+    --bg-panel: #ffffff;
+    --bg-navbar: #db2777;
+    --text-primary: #831843;
+    --text-muted: #bc4a7e;
+    --accent-color: #f472b6;
 }
 
-:root[data-theme='terminal'] {
-    /* TERMINAL THEME */
-    --bg-page: #020802;
-    --bg-surface: #051105;
-    --bg-surface-highlight: #0a220a;
-    --text-main: #4ade80;
-    --text-muted: #14532d;
-    --border-base: #22c55e;
-    --brand-primary: #4ade80;
-    --brand-primary-fg: #020802;
-
-    /* Synth Keys */
-    --key-white-bg: #051105;
-    --key-white-border: #22c55e;
-    --key-white-active: #0a220a;
-    --key-black-bg: #020802;
-    --key-black-border: #14532d;
-    --key-black-active: #14532d;
-
-    /* Game Assets */
-    --game-sky: #052e16;
-    --game-accent: #86efac;
-    --game-grass: #166534;
-
-    --game-casino-chip-10: #14532d;
-    --game-casino-chip-25: #15803d;
-    --game-casino-chip-50: #16a34a;
-    --game-casino-chip-100: #4ade80;
-
-    /* Fishing Assets (Terminal) */
-    --game-fishing-rod: #15803d;
-    --game-fishing-bobber-top: #4ade80;
-    --game-fishing-bobber-bottom: #020802;
-
-    /* Surfaces */
-    --game-floor-wood: #022c22;
-    --game-floor-road: #020802;
-    --game-wall-brick: #064e3b;
-    --game-brick-base: #064e3b;
-    --game-brick-mortar: #22c55e;
-    --game-water: #065f46;
-
-    /* Objects */
-    --game-object-wood: #14532d;
-    --game-object-metal: #15803d;
-
-    /* Characters (Terminal) */
-    --player-head: #22c55e;
-    --player-torso: #052e16;
-    --player-legs: #020802;
-    --npc-vest: #064e3b;
-    --npc-apron: #4ade80;
-    --npc-shirt-smoker: #14532d;
-
-    /* Lighting */
-    --game-light-warm: #4ade80;
-    --game-light-cool: #15803d;
-    --game-neon-main: #86efac;
-    --game-neon-alt: #22c55e;
-    --game-sun-color: #000000;
-    --game-window-glass: #000000;
+/* MORNING */
+:root, :root[data-time="morning"] {
+    --bg-main: #e0f2fe; /* Sky Blue */
+    --bg-panel: #ffffff;
+    --bg-navbar: #0284c7;
+    --text-primary: #0c4a6e;
+    --text-muted: #0369a1;
+    --accent-color: #38bdf8;
 }
 
-:root[data-theme='catppuccin'] {
-    /* CATPPUCCIN THEME */
-    --bg-page: #1e1e2e;
-    --bg-surface: #181825;
-    --bg-surface-highlight: #313244;
-    --text-main: #cdd6f4;
-    --text-muted: #7f849c;
-    --border-base: #45475a;
-    --brand-primary: #cba6f7;
-    --brand-primary-fg: #11111b;
-
-    /* Synth Keys */
-    --key-white-bg: #313244;
-    --key-white-border: #45475a;
-    --key-white-active: #45475a;
-    --key-black-bg: #11111b;
-    --key-black-border: #181825;
-    --key-black-active: #1e1e2e;
-
-    /* Game Assets */
-    --game-sky: #89dceb;
-    --game-accent: #f9e2af;
-    --game-grass: #a6e3a1;
-
-    --game-casino-chip-10: #89b4fa;
-    --game-casino-chip-25: #a6e3a1;
-    --game-casino-chip-50: #f38ba8;
-    --game-casino-chip-100: #45475a;
-
-    /* Fishing Assets (Catppuccin) */
-    --game-fishing-rod: #fab387;
-    --game-fishing-bobber-top: #f38ba8;
-    --game-fishing-bobber-bottom: #b4befe;
-
-    /* Surfaces */
-    --game-floor-wood: #eba0ac;
-    --game-floor-road: #181825;
-    --game-wall-brick: #f38ba8;
-    --game-brick-base: #f38ba8;
-    --game-brick-mortar: #45475a;
-    --game-water: #89b4fa;
-
-    /* Objects */
-    --game-object-wood: #fab387;
-    --game-object-metal: #585b70;
-
-    /* Characters (Catppuccin) */
-    --player-head: #f5e0dc;
-    --player-torso: #b4befe;
-    --player-legs: #45475a;
-    --npc-vest: #313244;
-    --npc-apron: #cba6f7;
-    --npc-shirt-smoker: #9399b2;
-
-    /* Lighting */
-    --game-light-warm: #f9e2af;
-    --game-light-cool: #89b4fa;
-    --game-neon-main: #cba6f7;
-    --game-neon-alt: #f5c2e7;
-    --game-sun-color: #000000;
-    --game-window-glass: #11111b;
+/* NOON */
+:root[data-time="noon"] {
+    --bg-main: #f8fafc; /* High Brightness Slate */
+    --bg-panel: #ffffff;
+    --bg-navbar: #475569;
+    --text-primary: #0f172a;
+    --text-muted: #64748b;
+    --accent-color: #eab308;
 }
 
-:root[data-theme='contrast'] {
-    /* HIGH CONTRAST */
-    --bg-page: #000000;
-    --bg-surface: #000000;
-    --bg-surface-highlight: #1a1a1a;
-    --text-main: #ffffff;
-    --text-muted: #ffffff;
-    --border-base: #ffffff;
-    --brand-primary: #00ffff;
-    --brand-primary-fg: #000000;
+/* AFTERNOON */
+:root[data-time="afternoon"] {
+    --bg-main: #fff7ed; /* Warm Orange Tint */
+    --bg-panel: #ffffff;
+    --bg-navbar: #ea580c;
+    --text-primary: #7c2d12;
+    --text-muted: #c2410c;
+    --accent-color: #fb923c;
+}
 
-    /* Synth Keys */
-    --key-white-bg: #000000;
-    --key-white-border: #ffffff;
-    --key-white-active: #333333;
-    --key-black-bg: #000000;
-    --key-black-border: #ffff00;
-    --key-black-active: #ffffff;
+/* DUSK */
+:root[data-time="dusk"] {
+    --bg-main: #2e1065; /* Deep Violet */
+    --bg-panel: #4c1d95;
+    --bg-navbar: #5b21b6;
+    --text-primary: #e9d5ff;
+    --text-muted: #a78bfa;
+    --accent-color: #f472b6;
+}
 
-    /* Game Assets */
-    --game-sky: #0000ff;
-    --game-accent: #ffff00;
-    --game-grass: #00ff00;
+/* MIDNIGHT */
+:root[data-time="midnight"] {
+    --bg-main: #020617; /* Near Black */
+    --bg-panel: #1e293b;
+    --bg-navbar: #0f172a;
+    --text-primary: #f1f5f9;
+    --text-muted: #94a3b8;
+    --accent-color: #6366f1;
+}
 
-    --game-casino-chip-10: #00ffff;
-    --game-casino-chip-25: #00ff00;
-    --game-casino-chip-50: #ff00ff;
-    --game-casino-chip-100: #ffff00;
+/* ============================================================================
+  LAYER 2: SEASONAL OVERRIDES
+  Adjusts base hues to reflect seasonal temperature differences.
+  =============================================================================
+*/
 
-    /* Fishing Assets (Contrast) */
-    --game-fishing-rod: #ffff00;
-    --game-fishing-bobber-top: #ff0000;
-    --game-fishing-bobber-bottom: #ffffff;
+/* Cold Season: Dawn (Shift Pink to Indigo) */
+:root[data-season="cold"][data-time="dawn"] {
+    --bg-main: #e0e7ff;
+    --text-primary: #312e81;
+    --accent-color: #818cf8;
+}
 
-    /* Surfaces */
-    --game-floor-wood: #ff00ff;
-    --game-floor-road: #333333;
-    --game-wall-brick: #ff0000;
-    --game-brick-base: #ff0000;
-    --game-brick-mortar: #ffffff;
-    --game-water: #0000ff;
+/* Cold Season: Afternoon (Shift Orange to Cool Slate) */
+:root[data-season="cold"][data-time="afternoon"] {
+    --bg-main: #f1f5f9;
+    --text-primary: #0f172a;
+    --accent-color: #94a3b8;
+}
 
-    /* Objects */
-    --game-object-wood: #0000ff;
-    --game-object-metal: #ffffff;
+/* ============================================================================
+  LAYER 3: WEATHER MODIFIERS
+  Global overrides for specific atmospheric conditions.
+  =============================================================================
+*/
 
-    /* Characters (Contrast) */
-    --player-head: #ffff00;
-    --player-torso: #00ffff;
-    --player-legs: #ffffff;
-    --npc-vest: #333333;
-    --npc-apron: #ff00ff;
-    --npc-shirt-smoker: #cccccc;
+/* WARM STORM */
+:root[data-season="warm"][data-weather="stormy"] {
+    --accent-color: #fbbf24;
+}
 
-    /* Lighting */
-    --game-light-warm: #ffff00;
-    --game-light-cool: #0000ff;
-    --game-neon-main: #ff00ff;
-    --game-neon-alt: #00ffff;
-    --game-sun-color: #ffffff;
-    --game-window-glass: #ffffff;
+/* COLD STORM (BLIZZARD) */
+:root[data-season="cold"][data-weather="stormy"] {
+    --accent-color: #e2e8f0;
+    --bg-main: #94a3b8;
+    --bg-panel: #cbd5e1;
+    --text-primary: #0f172a;
+    --bg-navbar: #475569;
+}
+
+/* WARM RAIN */
+:root[data-season="warm"][data-weather="rainy"] {
+    --accent-color: #60a5fa;
+}
+
+/* COLD RAIN (SLEET) */
+:root[data-season="cold"][data-weather="rainy"] {
+    --accent-color: #22d3ee;
+    --bg-main: #cbd5e1;
+}
+
+/* FOGGY (General)
+  Aesthetic: Low contrast, desaturated, high diffusion.
+  Change: Backgrounds become muted greys. Accents become silvery.
+*/
+:root[data-weather="foggy"] {
+    --accent-color: #94a3b8; /* Slate-400 */
+    --bg-main: #cbd5e1; /* Slate-300 - Standard Fog Grey */
+    --bg-panel: #e2e8f0; /* Slate-200 */
+    --text-primary: #1e293b; /* Slate-800 */
+    --bg-navbar: #475569; /* Slate-600 */
+}
+
+/* ============================================================================
+  LAYER 4: CONTEXTUAL LIGHTING CORRECTIONS
+  Specific overrides to ensure readability when weather conflicts with time.
+  =============================================================================
+*/
+
+/* DAYTIME STORM DARKENING (Warm Season) */
+:root[data-season="warm"][data-weather="stormy"][data-time="morning"],
+:root[data-season="warm"][data-weather="stormy"][data-time="noon"],
+:root[data-season="warm"][data-weather="stormy"][data-time="afternoon"] {
+    --bg-main: #334155;
+    --bg-panel: #475569;
+    --text-primary: #f1f5f9;
+    --bg-navbar: #1e293b;
+}
+
+/* NIGHT BLIZZARD VISIBILITY (Cold Season) */
+:root[data-season="cold"][data-weather="stormy"][data-time="midnight"],
+:root[data-season="cold"][data-weather="stormy"][data-time="dusk"] {
+    --bg-main: #1e293b;
+    --bg-panel: #334155;
+    --text-primary: #e2e8f0;
+}
+
+/* MIDNIGHT FOG (Light Scattering)
+  Aesthetic: Fog reflects ambient light sources, making the night brighter.
+  Change: Lifts the absolute black of midnight to a deep murky grey.
+*/
+:root[data-weather="foggy"][data-time="midnight"],
+:root[data-weather="foggy"][data-time="dusk"] {
+    --bg-main: #1e293b; /* Slate-900 (Brighter than Black) */
+    --bg-panel: #334155; /* Slate-700 */
+    --text-primary: #f1f5f9; /* Slate-50 */
+    --bg-navbar: #0f172a; /* Slate-950 */
+    --accent-color: #64748b; /* Muted Blue-Grey Accent */
 }

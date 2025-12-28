@@ -1,42 +1,44 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
+    /* Language and Environment */
+    "target": "ES2022",
+    /* Generate code for modern Node.js runtimes. */
+    "lib": [
+      "ES2023"
+    ],
+    /* Include latest ECMAScript library definitions. */
+
+    /* Modules */
+    "module": "NodeNext",
+    /* Output standard CommonJS modules for maximum Node compatibility. */
+    "moduleResolution": "NodeNext",
+    /* Use the modern Node.js module resolution strategy. */
     "rootDir": "./src",
+    /* Specify the root folder within your source files. */
     "outDir": "./dist",
-    // Environment Settings
-    // See also https://aka.ms/tsconfig/module
-    "module": "nodenext",
-    "target": "esnext",
-    "types": [],
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
+    /* Specify an output folder for all emitted files. */
 
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
+    /* Interop Constraints */
+    "esModuleInterop": true,
+    /* Emit additional JavaScript to ease support for importing CommonJS modules. */
+    "forceConsistentCasingInFileNames": true,
+    /* Ensure that casing is correct in imports. */
 
-    // Recommended Options
+    /* Type Checking */
     "strict": true,
-    "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-    "esModuleInterop": true
-  }
+    /* Enable all strict type-checking options. */
+    "noImplicitAny": true,
+    /* Enable error reporting for expressions and declarations with an implied 'any' type. */
+    "strictNullChecks": true,
+    /* When type checking, take into account 'null' and 'undefined'. */
+    "skipLibCheck": true
+    /* Skip type checking all .d.ts files. */
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
