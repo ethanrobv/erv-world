@@ -19,97 +19,110 @@ export const PacketType = {
 
     // Game Loop (Unreliable/High Frequency)
     PLAYER_UPDATE: 2,
-    WORLD_TICK: 3,
+    OBJECT_UPDATE: 3, // For physics objects (Crates, Fish)
+    WORLD_TICK: 4,
 
     // Events (Reliable)
-    GLOBAL_STATE: 4,
-    MINIGAME_RESULT: 5,
+    GLOBAL_STATE: 5,
+    INTERACTION_REQUEST: 6, // Client asks to interact
+    INTERACTION_RESPONSE: 7, // Host Approves/Denies
+    OBJECT_CLAIM: 8,         // "I own this now"
 } as const;
 
-export type PacketType = typeof PacketType[keyof typeof PacketType];
+/**
+ * Distinguishes the category of interaction.
+ */
+export const InteractionType = {
+    PHYSICS_CLAIM: 0, // Requesting authority over a RigidBody
+    LOGIC_REQUEST: 1  // Requesting a game state change (e.g. Minigame Join)
+} as const;
+
+export type InteractionType = typeof InteractionType[keyof typeof InteractionType];
 
 // =============================================================================
 // PAYLOAD DEFINITIONS
 // =============================================================================
 
-/**
- * Payload for the initial handshake request (Client -> Host).
- */
 export interface JoinRequestPayload {
     clientId: string;
     username: string;
 }
 
-/**
- * Payload containing the authoritative world state (Host -> Client).
- * Sent immediately after a successful connection.
- */
+export interface PlayerState {
+    id: string;
+    username: string;
+    p: Vector3;
+    q: Quaternion; // Rotation (Quaternion)
+}
+
 export interface WorldSnapshotPayload {
-    gameTime: number;       // Total game minutes (integer)
-    weather: number;        // Weather enum index
-    season: number;         // Season enum index
+    gameTime: number;
+    weather: number;
+    season: number;
     players: PlayerState[];
+    // We will add objects here later when we persist them
 }
 
 /**
- * High-frequency player update (Client -> Host).
- * Contains position and velocity for client-side prediction.
+ * Player Movement Update.
  */
 export interface PlayerUpdatePayload {
     id: string;
     p: Vector3;    // Position
-    r: number;     // Rotation (Y-axis)
+    q: Quaternion; // Rotation (Quaternion)
     v: Vector3;    // Velocity
     a: number;     // Animation State ID
 }
 
 /**
- * Aggregated world state update (Host -> All Clients).
+ * Physics Object Movement.
+ * Objects can tumble in all directions, requiring a Quaternion.
  */
+export interface ObjectUpdatePayload {
+    id: string;
+    p: Vector3;    // Position
+    q: Quaternion; // Rotation (Quaternion)
+    v: Vector3;    // Velocity
+}
+
 export interface WorldTickPayload {
     t: number;     // Server Timestamp
     p: PlayerUpdatePayload[];
+    o: ObjectUpdatePayload[]; // Batch object updates
 }
 
-/**
- * Updates for shared environmental variables (Host -> All Clients).
- */
 export interface GlobalStatePayload {
     type: number; // 0=WEATHER, 1=TIME, 2=SEASON
     val: number;
 }
 
 /**
- * Result of a locally executed minigame (Client -> Host).
+ * Generic Interaction Request.
  */
-export interface MinigameResultPayload {
-    id: string;
-    score: number;
-    data?: Record<string, unknown>;
+export interface InteractionRequestPayload {
+    netId: string; // The ID of the entity being interacted with
+    type: InteractionType;
+    data?: Record<string, unknown>; // Optional context (e.g., seat index)
+}
+
+/**
+ * Broadcasts ownership changes.
+ */
+export interface ObjectClaimPayload {
+    netId: string;
+    ownerId: string; // The socket ID of the new owner
 }
 
 // =============================================================================
 // PACKET UNION
 // =============================================================================
 
-/**
- * Master union type for all network packets.
- * This structure is strictly typed for MessagePack encoding/decoding.
- */
 export type GamePacket =
     | { t: typeof PacketType.JOIN_REQUEST; d: JoinRequestPayload }
     | { t: typeof PacketType.WORLD_SNAPSHOT; d: WorldSnapshotPayload }
     | { t: typeof PacketType.PLAYER_UPDATE; d: PlayerUpdatePayload }
+    | { t: typeof PacketType.OBJECT_UPDATE; d: ObjectUpdatePayload }
     | { t: typeof PacketType.WORLD_TICK; d: WorldTickPayload }
     | { t: typeof PacketType.GLOBAL_STATE; d: GlobalStatePayload }
-    | { t: typeof PacketType.MINIGAME_RESULT; d: MinigameResultPayload };
-
-/**
- * Helper interface for the internal player state.
- */
-export interface PlayerState {
-    id: string;
-    username: string;
-    p: Vector3;
-    r: number;
-}
+    | { t: typeof PacketType.INTERACTION_REQUEST; d: InteractionRequestPayload }
+    | { t: typeof PacketType.OBJECT_CLAIM; d: ObjectClaimPayload };

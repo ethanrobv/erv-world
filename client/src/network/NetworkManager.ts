@@ -2,7 +2,8 @@ import { io, Socket } from 'socket.io-client';
 import SimplePeer, { type Instance as PeerInstance, type SignalData } from 'simple-peer';
 import { decode, encode } from '@msgpack/msgpack';
 import { useNetworkStore } from '../store/networkStore';
-import { type GamePacket } from './Protocol';
+import { useGameStore, pushPlayerUpdate, pushObjectUpdate } from '../store/gameStore';
+import { PacketType, type GamePacket } from './Protocol';
 
 /**
  * Configuration for the signaling server connection.
@@ -36,6 +37,13 @@ class NetworkManager {
     }
 
     /**
+     * Exposes the local socket ID for identifying "Me" vs "Them".
+     */
+    public getSocketId(): string | undefined {
+        return this.socket?.id;
+    }
+
+    /**
      * Initializes the connection to the Signal Server.
      * Sets up listeners for room management and WebRTC signaling.
      */
@@ -58,7 +66,6 @@ class NetworkManager {
          */
         this.socket.on('signal', ({ sender, signal }: { sender: string; signal: SignalData }) => {
             const peer = this.peers.get(sender);
-
             if (peer) {
                 peer.signal(signal);
             } else {
@@ -98,9 +105,8 @@ class NetworkManager {
          * Handshake successful. Peer is ready for data transfer.
          */
         peer.on('connect', () => {
+            console.log(`[P2P] Connected to ${ targetId }`);
             useNetworkStore.getState().addPeer(targetId);
-            // NOTE: The initial World Snapshot is triggered by the Game Engine,
-            // not here, to keep this class pure logic.
         });
 
         /**
@@ -190,9 +196,83 @@ class NetworkManager {
             // We cast to GamePacket because we trust our Protocol definition.
             const packet = decode(data) as GamePacket;
 
-            // TODO: Route this packet to the Game Engine / Event Bus.
-            // For now, we log it to verify the binary stream is working.
-            // console.log(`[Packet] From ${ senderId }:`, packet);
+            switch (packet.t) {
+                case PacketType.PLAYER_UPDATE:
+                    // 1. Update Physics Engine (Smooths the movement)
+                    pushPlayerUpdate(packet.d.id, {
+                        timestamp: Date.now(),
+                        position: packet.d.p,
+                        velocity: packet.d.v,
+                        rotation: packet.d.q, // Using Quaternion from Protocol
+                        animState: packet.d.a // Using Animation ID from Protocol
+                    });
+
+                    // 2. LAZY DISCOVERY
+                    // If we receive data from a player we don't know about yet, add them to the visual store.
+                    // This ensures the <RemotePlayer> component actually mounts.
+                    const store = useGameStore.getState();
+                    if (!store.players.find(p => p.id === packet.d.id)) {
+                        store.addPlayer({
+                            id: packet.d.id,
+                            username: `Player ${ packet.d.id.slice(0, 4) }`, // Placeholder name
+                            isHost: false
+                        });
+                        console.log(`[Game] Discovered new player: ${ packet.d.id }`);
+                    }
+                    break;
+
+                case PacketType.OBJECT_UPDATE:
+                    pushObjectUpdate(packet.d.id, {
+                        timestamp: Date.now(),
+                        position: packet.d.p,
+                        velocity: packet.d.v,
+                        rotation: packet.d.q, // Supports Quaternion
+                        animState: 0 // Default animation state for objects
+                    });
+                    break;
+
+                case PacketType.OBJECT_CLAIM:
+                    useGameStore.getState().setObjectOwner(packet.d.netId, packet.d.ownerId);
+                    break;
+
+                case PacketType.GLOBAL_STATE:
+                    const { type, val } = packet.d;
+                    // Mapped to GlobalStatePayload enum: 0=Weather, 1=Time, 2=Season
+                    const gs = useGameStore.getState();
+                    if (type === 0) gs.setGlobalState(gs.gameTime, val, gs.season);
+                    else if (type === 1) gs.setGlobalState(val, gs.weather, gs.season);
+                    else if (type === 2) gs.setGlobalState(gs.gameTime, gs.weather, val);
+                    break;
+
+                case PacketType.WORLD_TICK:
+                    // Unpack batch updates
+                    packet.d.p.forEach(p => {
+                        pushPlayerUpdate(p.id, {
+                            timestamp: packet.d.t,
+                            position: p.p,
+                            velocity: p.v,
+                            rotation: p.q,
+                            animState: p.a
+                        });
+                    });
+                    // Unpack Objects if present
+                    if (packet.d.o) {
+                        packet.d.o.forEach(o => {
+                            pushObjectUpdate(o.id, {
+                                timestamp: packet.d.t,
+                                position: o.p,
+                                velocity: o.v,
+                                rotation: o.q,
+                                animState: 0
+                            });
+                        });
+                    }
+                    break;
+
+                // TODO: Handle Interaction Requests (Host side)
+                default:
+                    break;
+            }
 
         } catch (err) {
             console.error('[Network] Packet Decode Error:', err);
@@ -209,6 +289,9 @@ class NetworkManager {
             this.peers.delete(peerId);
         }
         useNetworkStore.getState().removePeer(peerId);
+
+        // Remove from game store so the avatar disappears
+        useGameStore.getState().removePlayer(peerId);
     }
 
     /**
@@ -218,6 +301,7 @@ class NetworkManager {
         this.peers.forEach((peer) => peer.destroy());
         this.peers.clear();
         useNetworkStore.getState().reset();
+        useGameStore.getState().reset();
     }
 }
 
