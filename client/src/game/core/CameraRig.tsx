@@ -10,7 +10,7 @@ import { CameraController, type CameraConfig } from '../mechanics/CameraSystem';
  */
 const DEFAULT_CONFIG: CameraConfig = {
     minDistance: 3,
-    maxDistance: 15,
+    maxDistance: 10,
     sensitivityX: 0.002,
     sensitivityY: 0.002,
     minPolarAngle: 1,
@@ -50,7 +50,7 @@ export const CameraRig = ({ targetRef, rotationRef }: CameraRigProps) => {
         };
 
         const handleWheel = (e: WheelEvent) => {
-            controller.current.zoom(e.deltaY);
+            controller.current.zoom(e.deltaY / 4);
         };
 
         canvas.addEventListener('click', handleClick);

@@ -1,13 +1,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { PhysicsEngine, type PhysicsSnapshot } from './PhysicsEngine';
-import { networkManager } from '../network/NetworkManager'; // [NEW] Import for optimistic broadcasting
+import { networkManager } from '../network/NetworkManager';
 import { PacketType } from '../network/Protocol';
-
-// =============================================================================
-// TIER 1: REACTIVE STATE (UI & LOGIC)
-// Used by React Components (HUD, Menus) for low-frequency updates.
-// =============================================================================
 
 interface PlayerMetadata {
     id: string;
@@ -15,21 +10,26 @@ interface PlayerMetadata {
     isHost: boolean;
 }
 
+/**
+ * Reactive Game State.
+ * Handles UI-relevant data and low-frequency logic updates.
+ */
 interface GameState {
-    /** Global game time (0-1440 minutes). Reactive because it changes skybox colors. */
+    // Environment
     gameTime: number;
-    /** Weather state index. Reactive because it toggles particle systems. */
     weather: number;
-    /** Season state index. Reactive because it changes textures. */
     season: number;
 
-    /** List of active players. Reactive because the Lobby UI needs to list them. */
+    // Lobby
     players: PlayerMetadata[];
+    /** The Socket ID of the peer designated to take over if the Host disconnects. */
+    heirId: string | null;
 
+    // Objects
     /**
      * Registry of Networked Objects.
      * Key: Network ID (e.g., 'crate_1').
-     * Value: Owner ID (Socket ID). If undefined/null, it implies HOST authority.
+     * Value: Owner ID (Socket ID). If undefined/null, implies HOST authority.
      */
     objectRegistry: Record<string, string | null>;
 
@@ -37,11 +37,10 @@ interface GameState {
     setGlobalState: (time: number, weather: number, season: number) => void;
     addPlayer: (player: PlayerMetadata) => void;
     removePlayer: (id: string) => void;
-
-    /** * Updates the registry locally (Response handling). */
+    setHeirId: (id: string | null) => void;
     setObjectOwner: (objectId: string, ownerId: string | null) => void;
 
-    /** * Optimistically claims an object and notifies the network. */
+    /** Optimistically claims an object and notifies the network. */
     claimObject: (objectId: string) => void;
 
     reset: () => void;
@@ -49,10 +48,11 @@ interface GameState {
 
 export const useGameStore = create<GameState>()(
     subscribeWithSelector((set, get) => ({
-        gameTime: 720, // Default to Noon
-        weather: 0,    // Clear
-        season: 0,     // Warm
+        gameTime: 720,
+        weather: 0,
+        season: 0,
         players: [],
+        heirId: null,
         objectRegistry: {},
 
         setGlobalState: (gameTime, weather, season) => set({ gameTime, weather, season }),
@@ -66,6 +66,8 @@ export const useGameStore = create<GameState>()(
             players: state.players.filter((p) => p.id !== id)
         })),
 
+        setHeirId: (id) => set({ heirId: id }),
+
         setObjectOwner: (objectId, ownerId) => set((state) => ({
             objectRegistry: {
                 ...state.objectRegistry,
@@ -74,36 +76,36 @@ export const useGameStore = create<GameState>()(
         })),
 
         claimObject: (objectId) => {
-            // 1. Get Local ID (Assuming the first player in list is 'me' or we need a proper ID source)
-            // Ideally, we get the socket ID from the NetworkManager, but for now we rely on the store knowing 'me'.
-            // For this implementation, we will fetch the ID directly from the Network store or Manager.
             const localId = networkManager.getSocketId();
             if (!localId) return;
 
-            // 2. Optimistic Local Update
+            // Optimistic Update
             set((state) => ({
                 objectRegistry: { ...state.objectRegistry, [objectId]: localId }
             }));
 
-            // 3. Network Broadcast
+            // Broadcast Claim
             networkManager.broadcast({
                 t: PacketType.OBJECT_CLAIM,
                 d: { netId: objectId, ownerId: localId }
             });
         },
 
-        reset: () => set({ players: [], objectRegistry: {}, gameTime: 720, weather: 0, season: 0 }),
+        reset: () => set({
+            players: [],
+            objectRegistry: {},
+            heirId: null,
+            gameTime: 720,
+            weather: 0,
+            season: 0
+        }),
     }))
 );
 
-// =============================================================================
-// TIER 2: TRANSIENT STATE (PHYSICS)
-// =============================================================================
+// --- PHYSICS ENGINE WRAPPERS ---
 
-// 1. Create the Singleton Instance for the App
 export const physicsEngine = new PhysicsEngine();
 
-// 2. Expose the API wrappers (Optional, or just export physicsEngine directly)
 export const pushPlayerUpdate = (id: string, update: PhysicsSnapshot) => {
     physicsEngine.pushUpdate(id, update);
 };

@@ -10,7 +10,7 @@ function App() {
         <Router>
             <div className='min-h-screen flex flex-col bg-main transition-colors duration-500'>
                 <Navbar/>
-                <main className='flex-grow container mx-auto px-4 py-6 relative'>
+                <main className='grow container mx-auto px-4 py-6 relative'>
                     <Routes>
                         <Route path='/' element={ <World/> }/>
                         <Route path='/world' element={ <World/> }/>

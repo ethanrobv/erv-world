@@ -16,22 +16,21 @@ export const PacketType = {
     // Handshake (Reliable)
     JOIN_REQUEST: 0,
     WORLD_SNAPSHOT: 1,
+    LOBBY_STATE: 9, // Syncs Lobby info (like Heir ID) to all peers
 
     // Game Loop (Unreliable/High Frequency)
     PLAYER_UPDATE: 2,
-    OBJECT_UPDATE: 3, // For physics objects (Crates, Fish)
+    OBJECT_UPDATE: 3,
     WORLD_TICK: 4,
 
     // Events (Reliable)
     GLOBAL_STATE: 5,
-    INTERACTION_REQUEST: 6, // Client asks to interact
-    INTERACTION_RESPONSE: 7, // Host Approves/Denies
-    OBJECT_CLAIM: 8,         // "I own this now"
+    INTERACTION_REQUEST: 6,
+    INTERACTION_RESPONSE: 7,
+    OBJECT_CLAIM: 8,
+    DISCONNECT: 10, // Polite signal that a peer is leaving intentionally
 } as const;
 
-/**
- * Distinguishes the category of interaction.
- */
 export const InteractionType = {
     PHYSICS_CLAIM: 0, // Requesting authority over a RigidBody
     LOGIC_REQUEST: 1  // Requesting a game state change (e.g. Minigame Join)
@@ -39,9 +38,7 @@ export const InteractionType = {
 
 export type InteractionType = typeof InteractionType[keyof typeof InteractionType];
 
-// =============================================================================
-// PAYLOAD DEFINITIONS
-// =============================================================================
+// --- PAYLOADS ---
 
 export interface JoinRequestPayload {
     clientId: string;
@@ -52,7 +49,7 @@ export interface PlayerState {
     id: string;
     username: string;
     p: Vector3;
-    q: Quaternion; // Rotation (Quaternion)
+    q: Quaternion;
 }
 
 export interface WorldSnapshotPayload {
@@ -60,35 +57,47 @@ export interface WorldSnapshotPayload {
     weather: number;
     season: number;
     players: PlayerState[];
-    // We will add objects here later when we persist them
 }
 
 /**
- * Player Movement Update.
+ * Sent by the Host to inform clients of lobby hierarchy changes.
+ */
+export interface LobbyStatePayload {
+    /** The Socket ID of the designated backup host (Heir). */
+    heirId: string | null;
+}
+
+/**
+ * High-frequency update of player state.
+ * Variable names are single-letter to reduce bandwidth overhead.
  */
 export interface PlayerUpdatePayload {
+    /** The Socket ID of the player. */
     id: string;
-    p: Vector3;    // Position
-    q: Quaternion; // Rotation (Quaternion)
-    v: Vector3;    // Velocity
-    a: number;     // Animation State ID
+    /** Position [x, y, z] */
+    p: Vector3;
+    /** Rotation Quaternion [x, y, z, w] */
+    q: Quaternion;
+    /** Linear Velocity [x, y, z] */
+    v: Vector3;
+    /** Animation State ID (0=Idle, 1=Run, 2=Jump, 3=Fall) */
+    a: number;
 }
 
 /**
- * Physics Object Movement.
- * Objects can tumble in all directions, requiring a Quaternion.
+ * High-frequency update of a physics object.
  */
 export interface ObjectUpdatePayload {
     id: string;
-    p: Vector3;    // Position
-    q: Quaternion; // Rotation (Quaternion)
-    v: Vector3;    // Velocity
+    p: Vector3;
+    q: Quaternion;
+    v: Vector3;
 }
 
 export interface WorldTickPayload {
-    t: number;     // Server Timestamp
+    t: number;
     p: PlayerUpdatePayload[];
-    o: ObjectUpdatePayload[]; // Batch object updates
+    o: ObjectUpdatePayload[];
 }
 
 export interface GlobalStatePayload {
@@ -96,33 +105,27 @@ export interface GlobalStatePayload {
     val: number;
 }
 
-/**
- * Generic Interaction Request.
- */
 export interface InteractionRequestPayload {
-    netId: string; // The ID of the entity being interacted with
+    netId: string;
     type: InteractionType;
-    data?: Record<string, unknown>; // Optional context (e.g., seat index)
+    data?: Record<string, unknown>;
 }
 
-/**
- * Broadcasts ownership changes.
- */
 export interface ObjectClaimPayload {
     netId: string;
-    ownerId: string; // The socket ID of the new owner
+    ownerId: string;
 }
 
-// =============================================================================
-// PACKET UNION
-// =============================================================================
+// --- PACKET UNION ---
 
 export type GamePacket =
     | { t: typeof PacketType.JOIN_REQUEST; d: JoinRequestPayload }
     | { t: typeof PacketType.WORLD_SNAPSHOT; d: WorldSnapshotPayload }
+    | { t: typeof PacketType.LOBBY_STATE; d: LobbyStatePayload }
     | { t: typeof PacketType.PLAYER_UPDATE; d: PlayerUpdatePayload }
     | { t: typeof PacketType.OBJECT_UPDATE; d: ObjectUpdatePayload }
     | { t: typeof PacketType.WORLD_TICK; d: WorldTickPayload }
     | { t: typeof PacketType.GLOBAL_STATE; d: GlobalStatePayload }
     | { t: typeof PacketType.INTERACTION_REQUEST; d: InteractionRequestPayload }
-    | { t: typeof PacketType.OBJECT_CLAIM; d: ObjectClaimPayload };
+    | { t: typeof PacketType.OBJECT_CLAIM; d: ObjectClaimPayload }
+    | { t: typeof PacketType.DISCONNECT; d: null };

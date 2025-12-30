@@ -20,15 +20,21 @@ export const MainMenu = ({ onResume }: MainMenuProps) => {
     const [isCopying, setIsCopying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Sync input with store if needed, or just keep local
+    /**
+     * Requests a new room from the Server.
+     */
     const handleCreateRoom = async () => {
         setIsLoading(true);
-        // Generate a random 4-char code for UX (Real app might get this from server)
-        const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-        await networkManager.createRoom(code);
+        const success = await networkManager.createRoom();
         setIsLoading(false);
+        if (!success) {
+            alert('Failed to create room. Signal server may be unavailable.');
+        }
     };
 
+    /**
+     * Joins a room using the user-provided code.
+     */
     const handleJoinRoom = () => {
         if (!joinInput) return;
         setIsLoading(true);
@@ -36,16 +42,22 @@ export const MainMenu = ({ onResume }: MainMenuProps) => {
         setIsLoading(false);
     };
 
+    /**
+     * Gracefully leaves the current session.
+     */
+    const handleDisconnect = () => {
+        networkManager.disconnect();
+    };
+
     const copyCodeToClipboard = () => {
         if (roomCode) {
-            navigator.clipboard.writeText(roomCode);
+            navigator.clipboard.writeText(roomCode).then();
             setIsCopying(true);
             setTimeout(() => setIsCopying(false), 2000);
         }
     };
 
     return (
-        // [UPDATED] Lighter backdrop (bg-black/20) for better visibility of the game behind
         <div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px] transition-all duration-300">
             <div
@@ -73,7 +85,6 @@ export const MainMenu = ({ onResume }: MainMenuProps) => {
                                     disabled={ isLoading || !isConnectedToSignal }
                                     className="flex flex-col items-center justify-center p-4 bg-main hover:bg-accent/10 border border-muted/30 hover:border-accent rounded-lg transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {/* [UPDATED] Removed Emoji */ }
                                     <span className="font-bold text-primary">Host Game</span>
                                 </button>
 
@@ -130,6 +141,13 @@ export const MainMenu = ({ onResume }: MainMenuProps) => {
                                     { peers.length } connected
                                 </span>
                             </div>
+
+                            <button
+                                onClick={ handleDisconnect }
+                                className="mt-2 w-full py-2 bg-red-900/50 hover:bg-red-900/80 text-red-200 font-bold text-sm uppercase rounded transition-colors"
+                            >
+                                Disconnect
+                            </button>
                         </div>
                     ) }
 

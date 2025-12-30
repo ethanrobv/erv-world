@@ -29,63 +29,83 @@ const io = new Server(server, {
 
 /**
  * STATE MANAGEMENT
- * In a production app, this would be Redis.
+ * In a production app, this would be backed by Redis.
  */
 
-// Maps Room Code -> Host Socket ID
+/** Maps Room Code (e.g. "ABCD") -> Host Socket ID */
 const rooms: Map<string, string> = new Map();
 
-// Maps Socket ID -> Room Code (For O(1) disconnect handling)
+/** Maps Socket ID -> Room Code (For O(1) disconnect lookups) */
 const socketToRoom: Map<string, string> = new Map();
+
+/**
+ * Generates a unique 4-character room code.
+ * @returns A unique uppercase alphanumeric string.
+ */
+const generateRoomCode = (): string => {
+    let code = '';
+    do {
+        code = Math.random().toString(36).substring(2, 6).toUpperCase();
+    } while (rooms.has(code));
+    return code;
+};
 
 io.on('connection', (socket: Socket) => {
     console.log(`[Connect] Socket ID: ${ socket.id }`);
 
     /**
-     * HOST: Registers a new game lobby.
-     * @param roomCode - Unique identifier for the room (Client generates this).
-     * @param callback - Acknowledgment callback to client.
+     * HOST: Request a new room. The server generates the code to ensure uniqueness.
+     * @param callback - Returns success status and the generated room code.
      */
-    socket.on('host:create', (roomCode: string, callback: (response: { success: boolean }) => void) => {
-        // Normalize input
+    socket.on('host:create', (callback: (response: { success: boolean; code?: string }) => void) => {
+        const code = generateRoomCode();
+
+        rooms.set(code, socket.id);
+        socketToRoom.set(socket.id, code);
+        socket.join(code);
+
+        console.log(`[Host] Room created: ${ code } by ${ socket.id }`);
+        callback({ success: true, code });
+    });
+
+    /**
+     * MIGRATION: A Backup Host (Heir) attempts to claim a room after the original Host disconnects.
+     * @param roomCode - The code of the room to claim.
+     * @param callback - Returns success if the room is available (or recently abandoned).
+     */
+    socket.on('host:claim', (roomCode: string, callback: (response: { success: boolean }) => void) => {
         const code = roomCode.toUpperCase();
 
         if (rooms.has(code)) {
-            console.warn(`[Host] Failed to create room ${ code }: Already exists.`);
+            console.warn(`[Host] Claim failed for ${ code }: Room still occupied.`);
             callback({ success: false });
             return;
         }
 
-        // 1. Register Room
         rooms.set(code, socket.id);
         socketToRoom.set(socket.id, code);
-
-        // 2. Join Socket Channel (For broadcast events)
         socket.join(code);
 
-        console.log(`[Host] Room created: ${ code } by ${ socket.id }`);
+        console.log(`[Migration] Room ${ code } claimed by new Host ${ socket.id }`);
         callback({ success: true });
     });
 
     /**
      * CLIENT: Attempts to join an existing lobby.
-     * @param roomCode - The code of the room to join.
+     * @param roomCode - The 4-character code of the room to join.
      */
     socket.on('client:join', (roomCode: string) => {
         const code = roomCode.toUpperCase();
         const hostId = rooms.get(code);
 
-        // 1. Validation
         if (!hostId) {
             socket.emit('error', { message: 'Room not found.' });
             return;
         }
 
-        // 2. Subscribe to Lobby Events (Crucial for receiving 'room:closed')
         socket.join(code);
 
-        // 3. Notify Host
-        // The Host will receive this event and initiate the WebRTC handshake (Offer).
+        // Notify Host to initiate WebRTC Offer
         io.to(hostId).emit('host:peer-joining', {
             peerId: socket.id
         });
@@ -94,8 +114,7 @@ io.on('connection', (socket: Socket) => {
     });
 
     /**
-     * SIGNALING: Relays WebRTC handshake data (SDP/ICE).
-     * This acts as the "Switchboard" for P2P connections.
+     * SIGNALING: Relays WebRTC handshake data (SDP/ICE) between peers.
      */
     socket.on('signal', (data: { target: string; signal: unknown }) => {
         io.to(data.target).emit('signal', {
@@ -105,40 +124,34 @@ io.on('connection', (socket: Socket) => {
     });
 
     /**
-     * DISCONNECT: Cleanup routine.
+     * DISCONNECT: Handles cleanup and triggers Host Migration if necessary.
      */
     socket.on('disconnect', () => {
         const roomCode = socketToRoom.get(socket.id);
 
         if (roomCode) {
-            // Check if the disconnecting user was the Host
             const hostId = rooms.get(roomCode);
 
             if (hostId === socket.id) {
-                // HOST LEFT: Kill the room
-                console.log(`[Disconnect] Host left. Closing room ${ roomCode }`);
+                console.log(`[Disconnect] Host left room ${ roomCode }. Triggering migration.`);
 
-                // Notify all clients in the room to reset their state
-                io.to(roomCode).emit('room:closed');
-
-                // Cleanup maps
+                // Clear the room mapping so the Heir can claim it via 'host:claim'
                 rooms.delete(roomCode);
+
+                // Notify all clients in the room that the Host is gone.
+                // Clients will check their local state to see if they are the designated Heir.
+                io.to(roomCode).emit('room:host_left');
             } else {
-                // CLIENT LEFT: (Optional) Notify host if needed
                 console.log(`[Disconnect] Client left room ${ roomCode }`);
             }
 
-            // Cleanup reverse lookup
             socketToRoom.delete(socket.id);
         }
-
-        console.log(`[Disconnect] Socket ID: ${ socket.id }`);
     });
 });
 
 server.listen(PORT, () => {
     console.log(`----------------------------------------`);
     console.log(`Signal Server running on port ${ PORT }`);
-    console.log(`CORS Policy: ${ CORS_ORIGIN }`);
     console.log(`----------------------------------------`);
 });

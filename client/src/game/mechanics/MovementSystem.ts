@@ -74,7 +74,7 @@ export class MovementController {
         jumpForce: 8,       // Balanced for tight, heavy gravity
         snapForce: -3,      // Gentle stickiness for slopes
         jumpDelay: 0.5,    // Short snappy windup
-        jumpCooldown: 0.2
+        jumpCooldown: 0.1
     };
 
     /**

@@ -38,6 +38,10 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
     const orientation = useCharacterOrientation(12);
     const { world, rapier } = useRapier();
 
+    // Spawn Point Configuration
+    const SPAWN_POINT = { x: 0, y: 10, z: 0 };
+    const WATER_LEVEL = -1.0;
+
     useFrame((_state, delta) => {
         if (!rigidBody.current) return;
 
@@ -45,7 +49,15 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
         const currentVel = rigidBody.current.linvel();
         const currentPos = rigidBody.current.translation();
 
-        // 1. Raycast Ground Check (Visuals Only)
+        // 0. WATER CHECK / RESPAWN SYSTEM
+        // If player touches water or falls off map, reset immediately.
+        if (currentPos.y < WATER_LEVEL) {
+            rigidBody.current.setTranslation(SPAWN_POINT, true);
+            rigidBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            return; // Skip rest of frame to prevent physics glitches
+        }
+
+        // 1. Raycast Ground Check
         const groundRay = new rapier.Ray(currentPos, { x: 0, y: -1, z: 0 });
         const groundHit = world.castRay(groundRay, 1.55, true, undefined, undefined, undefined, rigidBody.current);
         const isVisualGrounded = !!groundHit;
@@ -60,7 +72,7 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
             jumpForce
         } = movement.current.update(inputs, currentVel, movementBasis, delta);
 
-        // 3. Wall Sliding (Deflection)
+        // 3. Wall Sliding
         let moveX = desiredVel[0];
         let moveZ = desiredVel[2];
 
@@ -78,10 +90,8 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
             }
         }
 
-        // 4. DYNAMIC GRAVITY
-        // Rising = 2.5 (Heavy but jumpable), Falling = 5.0 (Snappy descent)
+        // 4. Dynamic Gravity
         const newGravity = currentVel.y < 0 ? 5.0 : 2.5;
-
         if (currentGravityScale.current !== newGravity) {
             currentGravityScale.current = newGravity;
             rigidBody.current.setGravityScale(newGravity, true);
@@ -89,12 +99,11 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
 
         // 5. Apply Physics
         rigidBody.current.setLinvel({ x: moveX, y: desiredVel[1], z: moveZ }, true);
-
         if (shouldLaunch) {
             rigidBody.current.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true);
         }
 
-        // 6. Visuals & Animation Sync
+        // 6. Visuals
         const isMoving = Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1;
         if (isMoving && visuals.current) {
             const targetAngle = Math.atan2(moveX, moveZ);
@@ -106,14 +115,11 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
         animationState.current.isJumping = isJumping;
         animationState.current.isFalling = isFalling;
 
-        // 7. NETWORK BROADCAST (15Hz)
-        // We broadcast at a lower frequency than physics (60Hz) to save bandwidth.
+        // 7. Network Broadcast (15Hz)
         const now = Date.now();
         if (now - lastBroadcast.current > 60) {
             const localId = networkManager.getSocketId();
             if (localId && visuals.current) {
-                // Encode Animation State for efficient network transfer
-                // 0: Idle, 1: Run, 2: Jump, 3: Fall
                 let animId = 0;
                 if (isJumping) animId = 2;
                 else if (isFalling) animId = 3;
@@ -144,7 +150,7 @@ export const Player = ({ physicsRef, cameraRotationRef }: PlayerProps) => {
             ref={ rigidBody }
             colliders={ false }
             enabledRotations={ [false, false, false] }
-            position={ [0, 5, 0] }
+            position={ [0, 10, 0] } // Default spawn height updated to match Logic
             linearDamping={ 0 }
             friction={ 0 }
             gravityScale={ 2.5 }

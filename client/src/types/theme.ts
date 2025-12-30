@@ -11,11 +11,16 @@ export type TimeOfDay = 'dawn' | 'morning' | 'noon' | 'afternoon' | 'dusk' | 'mi
 export type Weather = 'clear' | 'stormy' | 'rainy' | 'foggy';
 
 /**
+ * Represents the current seasonal cycle.
+ * Used to shift the color palette (e.g., warmer oranges vs cooler blues).
+ */
+export type Season = 'warm' | 'cold';
+
+/**
  * The aggregate state object representing the current environmental conditions.
  */
 export interface ThemeState {
-    /** The current time cycle state. */
     time: TimeOfDay;
-    /** The current weather condition. */
     weather: Weather;
+    season: Season;
 }

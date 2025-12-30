@@ -5,31 +5,14 @@ import { useNetworkStore } from '../store/networkStore';
 import { useGameStore, pushPlayerUpdate, pushObjectUpdate } from '../store/gameStore';
 import { PacketType, type GamePacket } from './Protocol';
 
-/**
- * Configuration for the signaling server connection.
- */
 const SIGNAL_SERVER_URL = import.meta.env.VITE_SIGNAL_SERVER_URL || 'http://localhost:3001';
 
 /**
  * NetworkManager Singleton.
- * * Manages the lifecycle of the P2P network, including signaling via Socket.io
- * and data transmission via WebRTC.
- * * DESIGN DECISIONS:
- * 1. Singleton Pattern: Ensures a single point of truth for network connections
- * independent of the React lifecycle.
- * 2. Star Topology: In a multiplayer session, one peer is the 'HOST' and
- * others are 'CLIENTS'. This centralizes game logic authority.
- * 3. Binary Protocol: Uses MessagePack (msgpack) instead of JSON for high-performance,
- * low-bandwidth serialization suitable for 60Hz game loops.
+ * Manages the P2P lifecycle, Signaling, Room Creation, and Host Migration.
  */
 class NetworkManager {
     private socket: Socket | null = null;
-
-    /**
-     * Internal registry of peer connections.
-     * Key: Socket ID of the remote peer.
-     * Value: SimplePeer instance.
-     */
     private peers: Map<string, PeerInstance> = new Map();
 
     constructor() {
@@ -37,16 +20,12 @@ class NetworkManager {
     }
 
     /**
-     * Exposes the local socket ID for identifying "Me" vs "Them".
+     * Returns the local Socket ID, used as the unique Player ID.
      */
     public getSocketId(): string | undefined {
         return this.socket?.id;
     }
 
-    /**
-     * Initializes the connection to the Signal Server.
-     * Sets up listeners for room management and WebRTC signaling.
-     */
     private initializeSignalConnection(): void {
         this.socket = io(SIGNAL_SERVER_URL);
 
@@ -59,66 +38,56 @@ class NetworkManager {
             this.cleanupAllPeers();
         });
 
-        /**
-         * Listener for incoming WebRTC signals.
-         * Logic: If a peer instance exists, provide the signal.
-         * If not, and we are not the initiator, create a new peer instance.
-         */
         this.socket.on('signal', ({ sender, signal }: { sender: string; signal: SignalData }) => {
             const peer = this.peers.get(sender);
             if (peer) {
                 peer.signal(signal);
             } else {
-                // We are the receiver of a join request. Initialize a non-initiating peer.
                 this.createPeer(sender, false, signal);
             }
         });
 
-        /**
-         * Host-specific: Triggered when a client attempts to join the room.
-         */
         this.socket.on('host:peer-joining', ({ peerId }: { peerId: string }) => {
             this.createPeer(peerId, true);
+        });
+
+        // Triggered by Server when the Host socket disconnects from the room.
+        this.socket.on('room:host_left', () => {
+            this.handleHostDisconnect();
         });
     }
 
     /**
-     * Creates and configures a WebRTC Peer connection.
-     * @param targetId - The socket ID of the remote peer.
-     * @param initiator - Whether this instance is initiating the handshake.
-     * @param initialSignal - Optional signal data to process on creation.
+     * Initializes a WebRTC connection with a remote peer.
+     * @param targetId - The Socket ID of the remote peer.
+     * @param initiator - Whether this client is initiating the connection (Caller vs Callee).
+     * @param initialSignal - The SDP signal to process immediately, if any.
      */
     private createPeer(targetId: string, initiator: boolean, initialSignal?: SignalData): void {
         const peer = new SimplePeer({
             initiator,
-            trickle: false, // Wait for all ICE candidates to simplify signaling flow.
+            trickle: false,
         });
 
-        /**
-         * Relays local signaling data to the remote peer via the Signal Server.
-         */
         peer.on('signal', (signal: SignalData) => {
             this.socket?.emit('signal', { target: targetId, signal });
         });
 
-        /**
-         * Handshake successful. Peer is ready for data transfer.
-         */
         peer.on('connect', () => {
             console.log(`[P2P] Connected to ${ targetId }`);
             useNetworkStore.getState().addPeer(targetId);
+
+            // If we are Host, check if we need to assign a new Heir
+            const { role } = useNetworkStore.getState();
+            if (role === 'HOST') {
+                this.updateHeir();
+            }
         });
 
-        /**
-         * Handles incoming data from the peer.
-         */
         peer.on('data', (data: Uint8Array) => {
             this.processIncomingData(targetId, data);
         });
 
-        /**
-         * Error and Close handling.
-         */
         peer.on('close', () => this.removePeer(targetId));
         peer.on('error', (err: Error) => {
             console.error(`[Network] Peer Error (${ targetId }):`, err);
@@ -133,24 +102,45 @@ class NetworkManager {
     }
 
     /**
-     * Registers a new room with the Signal Server.
-     * * @param roomCode - The desired room identifier.
-     * @returns Promise resolving to the success state of the creation.
+     * Calculates the designated Heir (Backup Host) and broadcasts it to the lobby.
+     * Rule: The first connected peer (Oldest Client) is the Heir.
      */
-    public async createRoom(roomCode: string): Promise<boolean> {
+    private updateHeir() {
+        const { peers } = useNetworkStore.getState();
+        const currentHeir = useGameStore.getState().heirId;
+
+        const newHeir = peers.length > 0 ? peers[0] : null;
+
+        if (newHeir !== currentHeir) {
+            useGameStore.getState().setHeirId(newHeir);
+
+            this.broadcast({
+                t: PacketType.LOBBY_STATE,
+                d: { heirId: newHeir }
+            });
+            console.log(`[Host] Heir Updated: ${ newHeir }`);
+        }
+    }
+
+    /**
+     * Requests a new room code from the server and establishes Host status.
+     * @returns True if room creation was successful.
+     */
+    public async createRoom(): Promise<boolean> {
         return new Promise((resolve) => {
-            this.socket?.emit('host:create', roomCode, (response: { success: boolean }) => {
-                if (response.success) {
-                    useNetworkStore.getState().setRoomInfo(roomCode, 'HOST');
+            this.socket?.emit('host:create', (response: { success: boolean; code?: string }) => {
+                if (response.success && response.code) {
+                    useNetworkStore.getState().setRoomInfo(response.code, 'HOST');
+                    resolve(true);
+                } else {
+                    resolve(false);
                 }
-                resolve(response.success);
             });
         });
     }
 
     /**
-     * Joins an existing room via the Signal Server.
-     * * @param roomCode - The target room identifier.
+     * Joins an existing room by code.
      */
     public joinRoom(roomCode: string): void {
         this.socket?.emit('client:join', roomCode);
@@ -158,11 +148,55 @@ class NetworkManager {
     }
 
     /**
-     * Sends a strictly typed message to a specific peer.
-     * Uses MessagePack for binary serialization.
-     * @param targetId - Socket ID of the recipient.
-     * @param packet - The typed GamePacket to serialize.
+     * Handles the logic when the Host disconnects.
+     * Checks if local player is the Heir; if so, claims the room.
+     * Otherwise, waits and rejoins to connect to the new Host.
      */
+    private handleHostDisconnect() {
+        const { role, roomCode } = useNetworkStore.getState();
+        const { heirId } = useGameStore.getState();
+        const myId = this.socket?.id;
+
+        if (role !== 'CLIENT' || !roomCode || !myId) return;
+
+        console.log(`[Migration] Host Disconnected. Heir is ${ heirId }`);
+
+        // Cleanup current P2P connections as the Star topology has collapsed
+        this.cleanupAllPeers(false); // false = Preserve Room Code in store
+
+        if (heirId === myId) {
+            // Promote to HOST
+            console.log('[Migration] Promoting self to HOST and claiming room.');
+            this.socket?.emit('host:claim', roomCode, (response: { success: boolean }) => {
+                if (response.success) {
+                    useNetworkStore.getState().setRoomInfo(roomCode, 'HOST');
+                    // Peers are currently disconnected; they will reconnect shortly.
+                } else {
+                    console.error('[Migration] Claim failed. Falling back to offline.');
+                    this.disconnect();
+                }
+            });
+        } else {
+            // Rejoin as CLIENT
+            console.log('[Migration] Waiting for new Host...');
+            // Random backoff (500-1500ms) to prevent thundering herd on the new Host
+            const delay = 500 + Math.random() * 1000;
+            setTimeout(() => {
+                this.joinRoom(roomCode);
+            }, delay);
+        }
+    }
+
+    /**
+     * Terminates the current session and resets state.
+     * Called when the user manually clicks "Disconnect".
+     */
+    public disconnect() {
+        // Send a polite goodbye packet so peers remove us immediately
+        this.broadcast({ t: PacketType.DISCONNECT, d: null });
+        this.cleanupAllPeers();
+    }
+
     public send(targetId: string, packet: GamePacket): void {
         const peer = this.peers.get(targetId);
         if (peer?.connected) {
@@ -171,11 +205,6 @@ class NetworkManager {
         }
     }
 
-    /**
-     * Broadcasts a strictly typed message to all connected peers.
-     * Uses MessagePack for binary serialization.
-     * * @param packet - The typed GamePacket to serialize.
-     */
     public broadcast(packet: GamePacket): void {
         const encoded = encode(packet);
         this.peers.forEach((peer) => {
@@ -185,40 +214,37 @@ class NetworkManager {
         });
     }
 
-    /**
-     * Decodes and routes incoming P2P data.
-     * @param senderId - Socket ID of the sender.
-     * @param data - The raw binary data (Uint8Array).
-     */
     private processIncomingData(senderId: string, data: Uint8Array): void {
         try {
-            // Binary Decode (MessagePack)
-            // We cast to GamePacket because we trust our Protocol definition.
             const packet = decode(data) as GamePacket;
 
             switch (packet.t) {
                 case PacketType.PLAYER_UPDATE:
-                    // 1. Update Physics Engine (Smooths the movement)
                     pushPlayerUpdate(packet.d.id, {
                         timestamp: Date.now(),
                         position: packet.d.p,
                         velocity: packet.d.v,
-                        rotation: packet.d.q, // Using Quaternion from Protocol
-                        animState: packet.d.a // Using Animation ID from Protocol
+                        rotation: packet.d.q,
+                        animState: packet.d.a
                     });
 
-                    // 2. LAZY DISCOVERY
-                    // If we receive data from a player we don't know about yet, add them to the visual store.
-                    // This ensures the <RemotePlayer> component actually mounts.
+                    // Lazy Discovery: Add unknown players to the store
                     const store = useGameStore.getState();
                     if (!store.players.find(p => p.id === packet.d.id)) {
                         store.addPlayer({
                             id: packet.d.id,
-                            username: `Player ${ packet.d.id.slice(0, 4) }`, // Placeholder name
+                            username: `Player ${ packet.d.id.slice(0, 4) }`,
                             isHost: false
                         });
-                        console.log(`[Game] Discovered new player: ${ packet.d.id }`);
                     }
+                    break;
+
+                case PacketType.LOBBY_STATE:
+                    useGameStore.getState().setHeirId(packet.d.heirId);
+                    break;
+
+                case PacketType.DISCONNECT:
+                    this.removePeer(senderId);
                     break;
 
                 case PacketType.OBJECT_UPDATE:
@@ -226,8 +252,8 @@ class NetworkManager {
                         timestamp: Date.now(),
                         position: packet.d.p,
                         velocity: packet.d.v,
-                        rotation: packet.d.q, // Supports Quaternion
-                        animState: 0 // Default animation state for objects
+                        rotation: packet.d.q,
+                        animState: 0
                     });
                     break;
 
@@ -237,7 +263,6 @@ class NetworkManager {
 
                 case PacketType.GLOBAL_STATE:
                     const { type, val } = packet.d;
-                    // Mapped to GlobalStatePayload enum: 0=Weather, 1=Time, 2=Season
                     const gs = useGameStore.getState();
                     if (type === 0) gs.setGlobalState(gs.gameTime, val, gs.season);
                     else if (type === 1) gs.setGlobalState(val, gs.weather, gs.season);
@@ -245,7 +270,6 @@ class NetworkManager {
                     break;
 
                 case PacketType.WORLD_TICK:
-                    // Unpack batch updates
                     packet.d.p.forEach(p => {
                         pushPlayerUpdate(p.id, {
                             timestamp: packet.d.t,
@@ -255,7 +279,6 @@ class NetworkManager {
                             animState: p.a
                         });
                     });
-                    // Unpack Objects if present
                     if (packet.d.o) {
                         packet.d.o.forEach(o => {
                             pushObjectUpdate(o.id, {
@@ -269,7 +292,6 @@ class NetworkManager {
                     }
                     break;
 
-                // TODO: Handle Interaction Requests (Host side)
                 default:
                     break;
             }
@@ -279,9 +301,6 @@ class NetworkManager {
         }
     }
 
-    /**
-     * Cleans up a specific peer connection.
-     */
     private removePeer(peerId: string): void {
         const peer = this.peers.get(peerId);
         if (peer) {
@@ -289,23 +308,34 @@ class NetworkManager {
             this.peers.delete(peerId);
         }
         useNetworkStore.getState().removePeer(peerId);
-
-        // Remove from game store so the avatar disappears
         useGameStore.getState().removePlayer(peerId);
+
+        // Re-evaluate Heir if we are Host and the Heir left
+        const { role } = useNetworkStore.getState();
+        const { heirId } = useGameStore.getState();
+        if (role === 'HOST' && peerId === heirId) {
+            this.updateHeir();
+        }
     }
 
     /**
-     * Cleans up all active peer connections.
+     * Resets network state and cleans up connections.
+     * @param resetRoomCode - Whether to clear the Room Code. Set to false during migration.
      */
-    private cleanupAllPeers(): void {
+    private cleanupAllPeers(resetRoomCode = true): void {
         this.peers.forEach((peer) => peer.destroy());
         this.peers.clear();
+
+        const { roomCode } = useNetworkStore.getState();
         useNetworkStore.getState().reset();
+
+        // If preserving room code (e.g. during migration), restore it after reset
+        if (!resetRoomCode && roomCode) {
+            useNetworkStore.getState().setRoomInfo(roomCode, 'NONE');
+        }
+
         useGameStore.getState().reset();
     }
 }
 
-/**
- * Singleton instance of the NetworkManager.
- */
 export const networkManager = new NetworkManager();
