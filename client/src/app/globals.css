@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+@import "tailwindcss";
+
+@theme {
+    --color-retro-bg: #0d1117;
+    --color-retro-border: #30363d;
+    --color-retro-text: #c9d1d9;
+    --color-retro-accent: #58a6ff;
+    --font-terminal: 'VT323', monospace;
+
+    /* Hard retro shadow */
+    --shadow-retro: 4px 4px 0px 0px rgba(0,0,0,0.5);
+
+    --animate-spin-slow: spin 10s linear infinite;
+}
+
+body {
+    background-color: var(--color-retro-bg);
+    color: var(--color-retro-text);
+    font-family: var(--font-terminal);
+    transition: background-color 1s ease, color 1s ease; /* Smooth Theme Transition */
+}
+
+/* Scrollbar Styling */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--color-retro-bg);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-retro-border);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-retro-accent);
+}

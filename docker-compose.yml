@@ -1,0 +1,22 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "8080:8080"
+    volumes:
+      - sqlite_data:/app/data  # Persist the DB file
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/fishing.db
+
+  client:
+    build: ./client
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://<YOUR_LIGHTSAIL_IP>:8080
+    depends_on:
+      - server
+
+volumes:
+  sqlite_data:

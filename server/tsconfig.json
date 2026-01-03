@@ -1,44 +1,15 @@
 {
   "compilerOptions": {
-    /* Language and Environment */
     "target": "ES2022",
-    /* Generate code for modern Node.js runtimes. */
-    "lib": [
-      "ES2023"
-    ],
-    /* Include latest ECMAScript library definitions. */
-
-    /* Modules */
-    "module": "NodeNext",
-    /* Output standard CommonJS modules for maximum Node compatibility. */
-    "moduleResolution": "NodeNext",
-    /* Use the modern Node.js module resolution strategy. */
+    "module": "commonjs",
     "rootDir": "./src",
-    /* Specify the root folder within your source files. */
     "outDir": "./dist",
-    /* Specify an output folder for all emitted files. */
-
-    /* Interop Constraints */
-    "esModuleInterop": true,
-    /* Emit additional JavaScript to ease support for importing CommonJS modules. */
-    "forceConsistentCasingInFileNames": true,
-    /* Ensure that casing is correct in imports. */
-
-    /* Type Checking */
     "strict": true,
-    /* Enable all strict type-checking options. */
-    "noImplicitAny": true,
-    /* Enable error reporting for expressions and declarations with an implied 'any' type. */
-    "strictNullChecks": true,
-    /* When type checking, take into account 'null' and 'undefined'. */
-    "skipLibCheck": true
-    /* Skip type checking all .d.ts files. */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
   ]
 }
