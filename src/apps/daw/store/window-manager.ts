@@ -1,0 +1,58 @@
+import { createWindowStore, type WindowState } from '../../../shared/lib/window-factory';
+
+const DEFAULT_WINDOWS: Record<string, WindowState> = {
+    arrangement: {
+        id: 'arrangement',
+        title: 'Timeline',
+        isOpen: true,
+        isPinned: true,
+        zIndex: 10,
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 0.6,
+        minWidth: 600,
+        minHeight: 300,
+    },
+    pianoRoll: {
+        id: 'pianoRoll',
+        title: 'Piano Roll',
+        isOpen: false,
+        isPinned: false,
+        zIndex: 20,
+        x: 0.15,
+        y: 0.15,
+        width: 0.7,
+        height: 0.6,
+        minWidth: 500,
+        minHeight: 300,
+    },
+    deviceRack: {
+        id: 'deviceRack',
+        title: 'Instrument',
+        isOpen: true,
+        isPinned: true,
+        zIndex: 30,
+        x: 0,
+        y: 0.6,
+        width: 0.5,
+        height: 0.4,
+        minWidth: 400,
+        minHeight: 200,
+    },
+    keyboard: {
+        id: 'keyboard',
+        title: 'Keys',
+        isOpen: true,
+        isPinned: true,
+        zIndex: 40,
+        x: 0.5,
+        y: 0.6,
+        width: 0.5,
+        height: 0.4,
+        minWidth: 400,
+        minHeight: 150,
+    },
+};
+
+export const { windowStore, WindowActions } = createWindowStore(DEFAULT_WINDOWS);

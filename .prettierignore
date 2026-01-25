@@ -1,0 +1,13 @@
+# Dependencies
+node_modules
+package-lock.json
+
+# Build Artifacts (JS/TS)
+coverage
+
+# Rust Build Artifacts
+target
+
+# IDE Settings
+.idea
+.vscode
