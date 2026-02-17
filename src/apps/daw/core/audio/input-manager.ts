@@ -168,11 +168,16 @@ export class InputManager {
     dispose() {
         window.removeEventListener('keydown', this.boundKeyDown);
         window.removeEventListener('keyup', this.boundKeyUp);
+
+        setActiveInputNotes(new Set<number>());
+        setCurrentChord('');
+
         if (this.midiAccess) {
             this.midiAccess.onstatechange = null;
             this.midiAccess.inputs.forEach((input) => {
                 input.onmidimessage = null;
             });
+            this.midiAccess = null;
         }
     }
 

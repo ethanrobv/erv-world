@@ -255,4 +255,27 @@ export class AudioEngine {
     setPlayState(isPlaying: boolean) {
         this.pushCommand(OP_PLAY_STATE, isPlaying ? 1 : 0, 0.0, 0);
     }
+
+    /**
+     * Shuts down the audio engine, releases hardware, and severs memory links.
+     */
+    public async terminate() {
+        this.setPlayState(false);
+
+        if (this.node) {
+            this.node.port.postMessage({ type: 'TERMINATE' });
+            this.node.disconnect();
+            this.node = null;
+        }
+
+        if (this.context && this.context.state !== 'closed') {
+            await this.context.close();
+            console.log('[AudioEngine] Hardware released.');
+        }
+
+        this.writeHead = null;
+        this.readHead = null;
+        this.commandView = null;
+        this.wasmMemory = null;
+    }
 }

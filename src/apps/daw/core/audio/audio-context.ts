@@ -43,3 +43,19 @@ export const initializeAudio = async () => {
         setIsAudioReady(false);
     }
 };
+
+/**
+ * Terminates the Audio Engine.
+ */
+export const terminateAudio = async () => {
+    if (!isAudioReady()) return;
+
+    try {
+        console.log('[AudioContext] Terminating...');
+        await audioEngine.terminate();
+        setIsAudioReady(false);
+        console.log('[AudioContext] Engine Terminated.');
+    } catch (err) {
+        console.error('[AudioContext] Termination Failed:', err);
+    }
+};

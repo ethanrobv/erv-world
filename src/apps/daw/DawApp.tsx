@@ -1,6 +1,6 @@
-import { createSignal, Show, type Component, createMemo } from 'solid-js';
+import { createSignal, createMemo, onCleanup, Show, type Component } from 'solid-js';
 
-import { audioEngine, audioLoadError, initializeAudio, isAudioReady } from './core/audio/audio-context';
+import { audioEngine, audioLoadError, initializeAudio, isAudioReady, terminateAudio } from './core/audio/audio-context';
 import { inputManager } from './core/audio/input-manager';
 import { project, ProjectActions } from './store/project';
 
@@ -26,6 +26,17 @@ const DawApp: Component = () => {
         if (!project.selectedClipId) return 'Piano Roll';
         const clip = project.clips[project.selectedClipId];
         return clip ? `Piano Roll - ${clip.name}` : 'Piano Roll';
+    });
+
+    /**
+     * Kills the DAW instance.
+     */
+    onCleanup(async () => {
+        inputManager.dispose();
+
+        if (isAudioReady()) {
+            await terminateAudio();
+        }
     });
 
     /**
