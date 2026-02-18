@@ -406,23 +406,31 @@ export const ProjectActions = {
      * Toggles playback. Starts audio engine and scheduler if playing.
      */
     togglePlay: async () => {
+        const bps = project.transport.tempo / 60;
+
         if (project.transport.isPlaying) {
+            const stopTime = audioEngine.currentTime;
+            const stopPosition = Math.max(0, (stopTime - project.transport.startTime) * bps);
+
+            setProject('transport', 'position', stopPosition);
             setProject('transport', 'isPlaying', false);
+
             audioEngine.setPlayState(false);
             audioScheduler.stop();
+
             if (project.transport.isRecording) {
                 setProject('transport', 'isRecording', false);
                 activeRecordingNotes.clear();
             }
         } else {
-            setProject('transport', 'isPlaying', true);
-            audioEngine.setPlayState(true);
-
-            // Re-anchor startTime to current audio time to ensure seamless resume
-            const bps = project.transport.tempo / 60;
             const currentPos = project.transport.position;
             const startTime = audioEngine.currentTime - currentPos / bps;
+
             setProject('transport', 'startTime', startTime);
+            setProject('transport', 'isPlaying', true);
+
+            audioEngine.setPosition(currentPos);
+            audioEngine.setPlayState(true);
 
             await audioScheduler.start();
         }
@@ -452,33 +460,33 @@ export const ProjectActions = {
     /**
      * Sets the playback tempo.
      * Encapsulates logic to re-anchor the start time if playing to prevent
-     * the playhead from jumping visually (Time Base Continuity).
+     * the playhead from fast-forwarding or rewinding visually.
      *
      * @param tempo - The new tempo in BPM (clamped 20-999).
      */
     setTempo: (tempo: number) => {
         const safeTempo = Math.max(20, Math.min(999, tempo));
         const previousTempo = project.transport.tempo;
-        const previousStartTime = project.transport.startTime;
 
         // Internal logic to apply tempo and handle time re-anchoring
         const applyTempoChange = (newTempo: number) => {
-            Mutators.setTempo(newTempo);
+            const currentTempo = project.transport.tempo;
+            const currentStartTime = project.transport.startTime;
 
             if (project.transport.isPlaying) {
                 const currentHardwareTime = audioEngine.currentTime;
-                // Calculate current position in beats using the OLD tempo
-                // We must use the previous state to determine where we are "right now"
-                const oldBps = project.transport.tempo / 60;
-                const currentPos = (currentHardwareTime - project.transport.startTime) * oldBps;
+                // Calculate current position in beats
+                const currentBps = currentTempo / 60;
+                const currentPos = (currentHardwareTime - currentStartTime) * currentBps;
 
-                // Back-calculate what the startTime SHOULD be for the NEW tempo
-                // to maintain that exact same position.
+                // Calculate newStartTime with respect to the new tempo
                 const newBps = newTempo / 60;
                 const newStartTime = currentHardwareTime - currentPos / newBps;
 
                 Mutators.setStartTime(newStartTime);
             }
+
+            Mutators.setTempo(newTempo);
         };
 
         applyTempoChange(safeTempo);
@@ -486,14 +494,9 @@ export const ProjectActions = {
         history.push({
             name: `Tempo to ${Math.round(safeTempo)}`,
             undo: () => {
-                Mutators.setTempo(previousTempo);
-                if (project.transport.isPlaying) {
-                    Mutators.setStartTime(previousStartTime);
-                }
+                applyTempoChange(previousTempo);
             },
             redo: () => {
-                // On redo, we cannot simply restore a value; we must re-calculate continuity
-                // because the audio time 'now' has advanced.
                 applyTempoChange(safeTempo);
             },
         });

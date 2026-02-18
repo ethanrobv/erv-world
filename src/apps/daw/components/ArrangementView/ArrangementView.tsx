@@ -90,8 +90,6 @@ export const ArrangementView: Component = () => {
 
     /**
      * Updates the visual position of the playhead (triangle and line).
-     * Uses requestAnimationFrame for smooth movement during playback.
-     * Applies output latency compensation to align visuals with heard audio.
      */
     const updatePlayheadTransform = () => {
         if (!playheadLine || !playheadTriangle) return;
@@ -99,25 +97,14 @@ export const ArrangementView: Component = () => {
         let currentBeat = project.transport.position;
 
         if (project.transport.isPlaying) {
-            // Audio Hardware Time
             const now = audioEngine.currentTime;
-            // When playback started (Already includes position offset from project.ts)
             const start = project.transport.startTime;
-            // Hardware Output Latency (time to speakers)
-            const latency = audioEngine.outputLatency;
 
-            // Calculate "Heard" time: (Current Hardware Time) - (Start Time) - (Output Delay)
-            const elapsed = Math.max(0, now - start - latency);
-
-            const bps = project.transport.tempo / 60;
-            currentBeat = elapsed * bps;
+            const elapsed = Math.max(0, now - start);
+            currentBeat = elapsed * (project.transport.tempo / 60);
         }
 
-        // Snap to nearest pixel to prevent sub-pixel rendering artifacts (flashing/jittering)
-        // on the 1px wide playhead line.
-        const px = Math.floor(currentBeat * getPxPerBeat());
-
-        // Use translate3d to force GPU layer promotion and smoother animation
+        const px = Math.round(currentBeat * getPxPerBeat());
         playheadLine.style.transform = `translate3d(${px}px, 0, 0)`;
         playheadTriangle.style.transform = `translate3d(${px - 5}px, 0, 0)`;
 
